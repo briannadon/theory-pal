@@ -171,9 +171,12 @@ end-to-end before running the full corpus.
 - M3. **DONE**. Key picker, diatonic and suggestion strips, chord cells, hooks, grid container, transport, MIDI port picker, and top-level `TheoryPal` layout in `src/App.tsx`.
 - M4. **DONE**. Progression grid container, drag-and-drop slot reordering, playback lookahead scheduler, Web MIDI out, and `.mid` export fully implemented and verified. Deploy pipeline is green: Pages is enabled, GitHub Actions builds and publishes on push.
 - M5 (post-MVP). **MOSTLY DONE**:
-  - Extended chords: the in-key strip's family selector became stackable
-    sus2/sus4/7/9 modifiers, carried through naming, roman numerals, voicing,
-    audition, and export.
+  - Extended chords: stackable sus2/sus4/6/7/9/11/13 modifiers, freely combinable,
+    applied either to the whole in-key row or to a single grid chord through a
+    popover on its tile, and carried through naming, roman numerals, voicing,
+    audition, and export. Naming follows lead-sheet convention via
+    `extensionSpelling` (stack named by its top note; everything else an added
+    tone).
   - Arp patterns: a shared `NoteEvent` IR (`theory/pattern.ts`) replaced the hardcoded
     "chord on every beat" in playback and the separately-derived timings in `.mid`
     export, and arpeggios ride on top of it — up/down/up-down/down-up/random at
@@ -191,7 +194,7 @@ end-to-end before running the full corpus.
   - Parts: chords and melody are separate voices with independent levels, separate
     live MIDI channels, and separate tracks in a format-1 `.mid` export.
 
-  Remaining: 11ths/13ths (same `ChordMods` mechanism); suggestion blend tuning;
+  Remaining: suggestion blend tuning;
   per-slot arp overrides; progression save/share (URL-encoded state is enough, still
   no backend). A corpus-trained melody model would need a second data pipeline
   (Essen or Lakh MIDI); only worth it if the rule engine proves too dull.

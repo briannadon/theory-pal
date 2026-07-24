@@ -40,18 +40,39 @@ export type ChordQuality =
 // ninth would be 12 spellings per degree. They ride alongside as `mods` (below),
 // which `stateKey` ignores, so the trained model never sees them.
 
-/** Alterations layered on a base quality. `sus` replaces the third; `ninth`
- * adds a 9th. Note "add the 7th" is not a mod — it means the degree's
- * *diatonic* 7th, which only the key knows, so callers pick the 7th quality
- * from `diatonicChords(key, true)` instead. */
-export interface ChordMods { sus?: 2 | 4; ninth?: boolean; }
+/** Alterations layered on a base quality. Every flag is independent, including
+ * sus2 with sus4 (both replace the third; together they give the 2nd and the
+ * 4th over the fifth). `sixth` is a 6th inside the chord; over a seventh it is
+ * spelled as the 13th it is. Note "add the 7th" is NOT a mod — it means the
+ * degree's *diatonic* 7th, which only the key knows, so it changes `quality`
+ * via `withSeventh`. */
+export interface ChordMods {
+  sus2?: boolean; sus4?: boolean;
+  sixth?: boolean; ninth?: boolean; eleventh?: boolean; thirteenth?: boolean;
+}
 
 /** A chord's makeup after mods, in the terms name renderers care about. */
 export interface ChordShape {
-  third: 'maj' | 'min' | 'sus2' | 'sus4' | 'none';
-  seventh: 'maj7' | 'b7' | 'bb7' | null;
-  ninth: boolean;
+  third: 'maj' | 'min' | 'sus2' | 'sus4' | 'sus2/4' | 'none';
+  seventh: 'maj7' | 'b7' | 'bb7' | null;   // read from the QUALITY, not the interval
+                                           // set: a 6th sits where dim7's bb7 does
+  sixth: boolean; ninth: boolean; eleventh: boolean; thirteenth: boolean;
 }
+
+/** How extensions are SPELLED, which is not which ones are present: lead-sheet
+ * convention names the top of an unbroken stack above the seventh and implies
+ * the rest (C-E-G-Bb-D-F-A is C13), and calls out anything that doesn't
+ * continue the stack as an added tone. Both name renderers use this. */
+export function extensionSpelling(shape: ChordShape): {
+  stack: 9 | 11 | 13 | null; added: (9 | 11 | 13)[]; sixth: boolean;
+};
+
+/** The seventh is a change of quality, not a mod, because which seventh a
+ * degree takes is a fact about the key (V -> dom7, I -> maj7). Non-diatonic
+ * chords fall back to the seventh their triad implies. */
+export function withSeventh(chord: RelChord, key: Key): RelChord;
+export function withoutSeventh(chord: RelChord): RelChord;
+export function hasSeventh(quality: ChordQuality): boolean;
 
 export type ScaleId =
   | 'ionian' | 'dorian' | 'phrygian' | 'lydian' | 'mixolydian' | 'aeolian' | 'locrian'

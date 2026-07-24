@@ -8,6 +8,7 @@
 // #IV and bV (this table picks #IV, matching common usage for the raised 4th).
 import {
   chordShape,
+  extensionSpelling,
   isMinorish,
   type ChordMods,
   type ChordQuality,
@@ -57,31 +58,40 @@ function mod12(n: number): number {
 // is V9, ii7 + 9 is ii9, and the case of the numeral still comes from the base
 // quality even when a sus has displaced the third — keeping ii recognizable as
 // ii once it becomes iisus4.
-const NINTH_SUFFIX: Partial<Record<ChordQuality, string>> = {
-  maj7: 'maj9',
-  dom7: '9',
-  min7: '9',
-  m7b5: 'ø9',
-  dim7: 'o7add9',
-  minMaj7: 'maj9',
-  dom7sus4: '9sus4',
+// 7th quality -> its roman suffix once an extension stack sits on top, as a
+// function of the stack's top note: V7 becomes V9/V11/V13, ii7 becomes
+// ii9/ii11/ii13. The numeral's case still comes from the base quality.
+const EXTENDED_SUFFIX: Partial<Record<ChordQuality, (stack: number) => string>> = {
+  maj7: (n) => `maj${n}`,
+  dom7: (n) => `${n}`,
+  min7: (n) => `${n}`,
+  m7b5: (n) => `ø${n}`,
+  minMaj7: (n) => `maj${n}`,
+  dom7sus4: (n) => `${n}sus4`,
 };
 
 function moddedSuffix(quality: ChordQuality, mods: ChordMods): string {
-  const { third, seventh, ninth } = chordShape(quality, mods);
+  const shape = chordShape(quality, mods);
+  const { third, seventh } = shape;
+  const { stack, added, sixth } = extensionSpelling(shape);
+  const sixthTag = sixth ? (shape.ninth ? '6/9' : '6') : '';
+  const addedTag = added.length > 0 ? `add${added.join(',')}` : '';
 
-  if (third === 'sus2' || third === 'sus4') {
-    const sus = third;
-    if (seventh && ninth) return `${seventh === 'maj7' ? 'maj9' : seventh === 'bb7' ? 'o9' : '9'}${sus}`;
-    if (seventh) return `${seventh === 'maj7' ? 'maj7' : seventh === 'bb7' ? 'o7' : '7'}${sus}`;
-    if (ninth) return `${sus}add9`;
-    return sus;
+  if (third === 'sus2' || third === 'sus4' || third === 'sus2/4') {
+    const sus = third === 'sus2/4' ? 'sus2/4' : third;
+    const core = seventh
+      ? `${seventh === 'maj7' ? 'maj' : seventh === 'bb7' ? 'o' : ''}${stack ?? 7}`
+      : sixthTag;
+    return `${core}${sus}${addedTag}`;
   }
 
   const base = QUALITY_SUFFIX[quality];
-  if (!ninth) return base;
-  if (!seventh) return `${base}add9`;
-  return NINTH_SUFFIX[quality] ?? `${base}add9`;
+  if (sixthTag) {
+    const rest = added.filter((n) => n !== 9);
+    return `${base}${sixthTag}${rest.length > 0 ? `add${rest.join(',')}` : ''}`;
+  }
+  if (stack === null) return `${base}${addedTag}`;
+  return `${EXTENDED_SUFFIX[quality]?.(stack) ?? base}${addedTag}`;
 }
 
 export function romanNumeral(c: RelChord, _key: Key): string {

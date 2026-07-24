@@ -23,8 +23,6 @@ import {
   voiceChord,
   DEFAULT_BAR_STYLE,
   type BarStyle,
-  type ChordMods,
-  type ChordQuality,
   type Key,
   type MelodyLane,
   type RelChord,
@@ -266,20 +264,12 @@ export function TheoryPal() {
     URL.revokeObjectURL(url);
   }, [grid.slots, key, bpm, style, melody]);
 
-  // Picking from the dropdown replaces the chord's quality *and* modifiers
-  // with exactly what was chosen: the list carries its own mods (9ths are a
-  // base quality plus `ninth`), so keeping the old ones would silently
-  // contradict the selection.
-  const handleModifyQualitySlot = useCallback(
-    (index: number, quality: ChordQuality, mods?: ChordMods) => {
-      setGrid((g) => {
-        const existing = g.slots[index];
-        if (!existing) return g;
-        return setSlot(g, index, { degree: existing.degree, quality, ...(mods && { mods }) });
-      });
-    },
-    [],
-  );
+  // The slot popover hands back the whole rewritten chord — it owns the
+  // quality/mods split (see ui/logic/chordMods.ts), so there is nothing to
+  // reassemble here.
+  const handleModifySlot = useCallback((index: number, chord: RelChord) => {
+    setGrid((g) => (g.slots[index] ? setSlot(g, index, chord) : g));
+  }, []);
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
@@ -310,7 +300,7 @@ export function TheoryPal() {
             onClearGrid={() => setGrid((g) => createGrid(g.size))}
             onAuditionSlot={handleAudition}
             onClearSlot={(idx: number) => setGrid((g) => clearSlot(g, idx))}
-            onModifyQualitySlot={handleModifyQualitySlot}
+            onModifySlot={handleModifySlot}
             onHoverSlot={setHoveredBar}
           />
           <MelodySection

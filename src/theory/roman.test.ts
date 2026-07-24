@@ -75,8 +75,21 @@ describe('romanNumeral with modifiers', () => {
   });
 
   it('renders sus modifiers, keeping the base quality’s case', () => {
-    expect(romanNumeral({ degree: 2, quality: 'min', mods: { sus: 4 } }, cMajor)).toBe('iisus4');
-    expect(romanNumeral({ degree: 7, quality: 'dom7', mods: { sus: 4 } }, cMajor)).toBe('V7sus4');
-    expect(romanNumeral({ degree: 7, quality: 'dom7', mods: { sus: 4, ninth: true } }, cMajor)).toBe('V9sus4');
+    expect(romanNumeral({ degree: 2, quality: 'min', mods: { sus4: true } }, cMajor)).toBe('iisus4');
+    expect(romanNumeral({ degree: 7, quality: 'dom7', mods: { sus4: true } }, cMajor)).toBe('V7sus4');
+    expect(romanNumeral({ degree: 7, quality: 'dom7', mods: { sus4: true, ninth: true } }, cMajor)).toBe('V9sus4');
+  });
+});
+
+describe('romanNumeral with 6ths and extension stacks', () => {
+  it('numbers the top of the stack', () => {
+    expect(romanNumeral({ degree: 7, quality: 'dom7', mods: { ninth: true, thirteenth: true } }, cMajor)).toBe('V13');
+    expect(romanNumeral({ degree: 2, quality: 'min7', mods: { ninth: true, eleventh: true } }, cMajor)).toBe('ii11');
+  });
+
+  it('marks 6ths, keeping the degree’s case', () => {
+    expect(romanNumeral({ degree: 0, quality: 'maj', mods: { sixth: true } }, cMajor)).toBe('I6');
+    expect(romanNumeral({ degree: 9, quality: 'min', mods: { sixth: true } }, cMajor)).toBe('vi6');
+    expect(romanNumeral({ degree: 0, quality: 'maj', mods: { sixth: true, ninth: true } }, cMajor)).toBe('I6/9');
   });
 });

@@ -1,12 +1,16 @@
 // The in-key chord row. Rather than picking one prebuilt family (triads /
 // 7ths / sus), the user stacks independent modifiers onto the key's diatonic
-// chords and the whole row re-renders: sus2 and sus4 are mutually exclusive
-// (both replace the third, so only one can win), while 7 and 9 are free.
+// chords and the whole row re-renders. Every toggle is free to combine,
+// including sus2 with sus4 — both replace the third, and together they give
+// the 2nd and the 4th over the fifth.
 //
 // The 7 toggle is not a `ChordMods` field: "add the 7th" means *this degree's
 // diatonic 7th* — V gets a dom7, I a maj7 — which only the key knows, so it
-// selects the 7th-chord set from `diatonicChords` instead. sus and 9 are
+// selects the 7th-chord set from `diatonicChords` instead. The rest are
 // key-independent alterations and ride along as mods.
+//
+// The toggles themselves are `ModifierBar`, shared with each grid slot's
+// popover so the two can't drift apart.
 import { useState } from 'react';
 import {
   chordName,
@@ -17,6 +21,7 @@ import {
   type Key,
   type RelChord,
 } from '../../theory/index.ts';
+import { ModifierBar, NO_MODIFIERS, type ChordModifier, type ModifierState } from './ModifierBar.tsx';
 import { StripCell } from './StripCell.tsx';
 
 export interface DiatonicStripProps {
@@ -24,63 +29,38 @@ export interface DiatonicStripProps {
   onAudition: (chord: RelChord) => void;
 }
 
-type Sus = 2 | 4 | null;
-
 export function DiatonicStrip({ keyValue, onAudition }: DiatonicStripProps) {
-  const [sus, setSus] = useState<Sus>(null);
-  const [seventh, setSeventh] = useState(false);
-  const [ninth, setNinth] = useState(false);
+  const [mods, setMods] = useState<ModifierState>(NO_MODIFIERS);
 
-  const mods: ChordMods | undefined =
-    sus === null && !ninth ? undefined : { ...(sus !== null && { sus }), ...(ninth && { ninth }) };
+  const chordMods: ChordMods = {
+    ...(mods.sus2 && { sus2: true }),
+    ...(mods.sus4 && { sus4: true }),
+    ...(mods.sixth && { sixth: true }),
+    ...(mods.ninth && { ninth: true }),
+    ...(mods.eleventh && { eleventh: true }),
+    ...(mods.thirteenth && { thirteenth: true }),
+  };
+  const hasMods = Object.keys(chordMods).length > 0;
 
-  const chords: RelChord[] = diatonicChords(keyValue, seventh).map((rc) =>
-    mods ? { ...rc, mods } : rc,
+  const chords: RelChord[] = diatonicChords(keyValue, mods.seventh).map((rc) =>
+    hasMods ? { ...rc, mods: chordMods } : rc,
   );
 
-  // Clicking the active sus clears it; clicking the other one swaps.
-  const toggleSus = (value: 2 | 4) => setSus((cur) => (cur === value ? null : value));
+  const toggle = (modifier: ChordModifier) =>
+    setMods((current) => ({ ...current, [modifier]: !current[modifier] }));
 
-  const modKey = `${sus ?? 'x'}-${seventh ? '7' : ''}-${ninth ? '9' : ''}`;
+  // Re-key the cells whenever the modifier set changes, so a restyled row
+  // mounts fresh rather than animating a chord into a different chord.
+  const modKey = Object.entries(mods)
+    .filter(([, on]) => on)
+    .map(([k]) => k)
+    .join('-');
 
   return (
     <section className="tp-strip">
       <div className="tp-strip__header">
         <span className="tp-strip__eyebrow">In key</span>
-        <div className="tp-size-group" role="group" aria-label="Chord modifiers">
-          <button
-            type="button"
-            className="tp-size-btn"
-            aria-pressed={sus === 2}
-            onClick={() => toggleSus(2)}
-          >
-            sus2
-          </button>
-          <button
-            type="button"
-            className="tp-size-btn"
-            aria-pressed={sus === 4}
-            onClick={() => toggleSus(4)}
-          >
-            sus4
-          </button>
-          <button
-            type="button"
-            className="tp-size-btn"
-            aria-pressed={seventh}
-            onClick={() => setSeventh((v) => !v)}
-          >
-            7
-          </button>
-          <button
-            type="button"
-            className="tp-size-btn"
-            aria-pressed={ninth}
-            onClick={() => setNinth((v) => !v)}
-          >
-            9
-          </button>
-        </div>
+        <ModifierBar value={mods} onToggle={toggle} ariaLabel="Chord modifiers" />
         <span className="tp-strip__hint" style={{ marginLeft: 'auto' }}>
           click to hear · drag into the grid
         </span>

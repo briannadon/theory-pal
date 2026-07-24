@@ -77,9 +77,43 @@ describe('chordName with modifiers', () => {
   });
 
   it('drops the third-quality marker on sus chords', () => {
-    expect(chordName({ root: 2, quality: 'min7', mods: { sus: 4 } })).toBe('D7sus4');
-    expect(chordName({ root: 0, quality: 'maj7', mods: { sus: 4 } })).toBe('Cmaj7sus4');
-    expect(chordName({ root: 7, quality: 'dom7', mods: { sus: 4, ninth: true } })).toBe('G9sus4');
-    expect(chordName({ root: 0, quality: 'maj', mods: { sus: 2 } })).toBe('Csus2');
+    expect(chordName({ root: 2, quality: 'min7', mods: { sus4: true } })).toBe('D7sus4');
+    expect(chordName({ root: 0, quality: 'maj7', mods: { sus4: true } })).toBe('Cmaj7sus4');
+    expect(chordName({ root: 7, quality: 'dom7', mods: { sus4: true, ninth: true } })).toBe('G9sus4');
+    expect(chordName({ root: 0, quality: 'maj', mods: { sus2: true } })).toBe('Csus2');
+  });
+});
+
+describe('chordName with 6ths and extension stacks', () => {
+  it('names a 6th chord, and a 6/9', () => {
+    expect(chordName({ root: 0, quality: 'maj', mods: { sixth: true } })).toBe('C6');
+    expect(chordName({ root: 0, quality: 'min', mods: { sixth: true } })).toBe('Cm6');
+    expect(chordName({ root: 0, quality: 'maj', mods: { sixth: true, ninth: true } })).toBe('C6/9');
+  });
+
+  it('spells a 6th over a seventh as the 13th it is', () => {
+    expect(chordName({ root: 0, quality: 'dom7', mods: { sixth: true } })).toBe('C7(add13)');
+    expect(chordName({ root: 0, quality: 'dom7', mods: { sixth: true, ninth: true } })).toBe('C13');
+  });
+
+  it('names an unbroken stack by its top note', () => {
+    const dom7 = (mods: object) => chordName({ root: 0, quality: 'dom7', mods });
+    expect(dom7({ ninth: true })).toBe('C9');
+    expect(dom7({ ninth: true, eleventh: true })).toBe('C11');
+    expect(dom7({ ninth: true, eleventh: true, thirteenth: true })).toBe('C13');
+    expect(chordName({ root: 0, quality: 'min7', mods: { ninth: true, eleventh: true } })).toBe('Cm11');
+    expect(
+      chordName({ root: 0, quality: 'maj7', mods: { ninth: true, eleventh: true, thirteenth: true } }),
+    ).toBe('Cmaj13');
+  });
+
+  it('spells extensions that do not continue the stack as added tones', () => {
+    expect(chordName({ root: 0, quality: 'min7', mods: { eleventh: true } })).toBe('Cm7(add11)');
+    expect(chordName({ root: 0, quality: 'maj', mods: { eleventh: true } })).toBe('Cadd11');
+  });
+
+  it('names sus2 and sus4 together', () => {
+    expect(chordName({ root: 0, quality: 'maj', mods: { sus2: true, sus4: true } })).toBe('Csus2/4');
+    expect(chordName({ root: 0, quality: 'maj', mods: { sus4: true, sixth: true } })).toBe('C6sus4');
   });
 });

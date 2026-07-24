@@ -9,6 +9,7 @@
 import {
   chordIntervals,
   chordShape,
+  extensionSpelling,
   isMinorish,
   type AbsChord,
   type ChordMods,
@@ -81,39 +82,67 @@ const CHORD_SUFFIX: Record<ChordQuality, string> = {
   dom7sus4: '7sus4',
 };
 
-// Chord-symbol suffix for a *modified* chord, built from its shape rather
-// than looked up: sus × seventh × ninth is far too many combinations to
-// tabulate, and all of them follow the same handful of naming conventions.
-// A sus chord has no third, so the third-quality marker ("m") is dropped —
-// a sus4'd min7 is 7sus4, not m7sus4.
+// Chord-symbol suffix for a *modified* chord, built from its shape rather than
+// looked up: sus × seventh × ninth × eleventh × thirteenth is far too many
+// combinations to tabulate, and all of them follow the same handful of naming
+// conventions.
+//
+// Two of those conventions do the real work. A sus chord has no third, so the
+// third-quality marker ("m") is dropped — a sus4'd min7 is 7sus4, not m7sus4.
+// And an unbroken extension stack is named by its top note, with the ones
+// below implied (C-E-G-Bb-D-F-A is C13), while anything that doesn't continue
+// the stack is spelled out as an added tone. `extensionSpelling` decides that
+// split; this function only has to render it.
 function moddedSuffix(quality: ChordQuality, mods: ChordMods): string {
-  const { third, seventh, ninth } = chordShape(quality, mods);
+  const shape = chordShape(quality, mods);
+  const { third, seventh } = shape;
+  const { stack, added, sixth } = extensionSpelling(shape);
+  // A 6th with a 9th over it is the standard "6/9" voicing; alone it is just
+  // a 6th chord. (Over a seventh it has already become the 13th.)
+  const sixthTag = sixth ? (shape.ninth ? '6/9' : '6') : '';
 
-  if (third === 'sus2' || third === 'sus4') {
-    const sus = third;
-    if (seventh && ninth) return `${seventh === 'maj7' ? 'maj9' : seventh === 'bb7' ? 'dim9' : '9'}${sus}`;
-    if (seventh) return `${seventh === 'maj7' ? 'maj7' : seventh === 'bb7' ? 'dim7' : '7'}${sus}`;
-    if (ninth) return `${sus}add9`;
-    return sus;
+  const addedTag = (): string => {
+    if (added.length === 0) return '';
+    const list = added.join(',');
+    // Over a seventh the added tone needs parentheses to stay readable
+    // (C7(add13)); over a bare triad the bald form is the idiom (Cadd9).
+    return seventh ? `(add${list})` : `add${list}`;
+  };
+
+  if (third === 'sus2' || third === 'sus4' || third === 'sus2/4') {
+    const sus = third === 'sus2/4' ? 'sus2/4' : third;
+    let core: string;
+    if (seventh) {
+      const flavor = seventh === 'maj7' ? 'maj' : seventh === 'bb7' ? 'dim' : '';
+      core = `${flavor}${stack ?? 7}`;
+    } else {
+      core = sixthTag;
+    }
+    return `${core}${sus}${addedTag()}`;
   }
 
   const base = CHORD_SUFFIX[quality];
-  if (!ninth) return base;
-  // A 9th over a 7th absorbs it into the chord's name (Cmaj7 + 9 = Cmaj9);
-  // a 9th without one is an added tone (C + 9 = Cadd9).
-  if (!seventh) return `${base}add9`;
-  return NINTH_SUFFIX[quality] ?? `${base}add9`;
+  if (sixthTag) {
+    // The 9th is part of "6/9", so it must not also appear as an added tone.
+    const rest = added.filter((n) => n !== 9);
+    const tag = rest.length > 0 ? `add${rest.join(',')}` : '';
+    return `${base}${sixthTag}${tag}`;
+  }
+  if (stack === null) return `${base}${addedTag()}`;
+  return `${EXTENDED_SUFFIX[quality]?.(stack) ?? base}${addedTag()}`;
 }
 
-// 7th quality -> the name it takes once a 9th is stacked on top.
-const NINTH_SUFFIX: Partial<Record<ChordQuality, string>> = {
-  maj7: 'maj9',
-  dom7: '9',
-  min7: 'm9',
-  m7b5: 'm9b5',
-  dim7: 'dim7add9', // no conventional "dim9"; the added tone is spelled out
-  minMaj7: 'm(maj9)',
-  dom7sus4: '9sus4',
+// 7th quality -> its name once an extension stack sits on top, as a function
+// of the stack's top note: dom7 -> C9/C11/C13, min7 -> Cm9/Cm11/Cm13, and so
+// on. dim7 is absent: there is no conventional "dim9", so it keeps its own
+// name and the extension is spelled as an added tone.
+const EXTENDED_SUFFIX: Partial<Record<ChordQuality, (stack: number) => string>> = {
+  maj7: (n) => `maj${n}`,
+  dom7: (n) => `${n}`,
+  min7: (n) => `m${n}`,
+  m7b5: (n) => `m${n}b5`,
+  minMaj7: (n) => `m(maj${n})`,
+  dom7sus4: (n) => `${n}sus4`,
 };
 
 export function chordName(c: AbsChord): string {

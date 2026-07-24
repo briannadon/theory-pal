@@ -3,6 +3,10 @@ import {
   chordIntervals,
   chordPitches,
   chordShape,
+  extensionSpelling,
+  hasSeventh,
+  withSeventh,
+  withoutSeventh,
   diatonicChords,
   isDiatonic,
   parseStateKey,
@@ -203,21 +207,21 @@ describe('chord modifiers', () => {
   });
 
   it('sus replaces the third but keeps the fifth and any seventh', () => {
-    expect(chordIntervals('maj', { sus: 4 })).toEqual([0, 5, 7]);
-    expect(chordIntervals('min', { sus: 2 })).toEqual([0, 2, 7]);
-    expect(chordIntervals('dom7', { sus: 4 })).toEqual(QUALITY_INTERVALS.dom7sus4);
-    expect(chordIntervals('maj7', { sus: 4 })).toEqual([0, 5, 7, 11]);
-    expect(chordIntervals('m7b5', { sus: 4 })).toEqual([0, 5, 6, 10]); // b5 survives
+    expect(chordIntervals('maj', { sus4: true })).toEqual([0, 5, 7]);
+    expect(chordIntervals('min', { sus2: true })).toEqual([0, 2, 7]);
+    expect(chordIntervals('dom7', { sus4: true })).toEqual(QUALITY_INTERVALS.dom7sus4);
+    expect(chordIntervals('maj7', { sus4: true })).toEqual([0, 5, 7, 11]);
+    expect(chordIntervals('m7b5', { sus4: true })).toEqual([0, 5, 6, 10]); // b5 survives
   });
 
   it('adds a 9th independently of the 7th', () => {
     expect(chordIntervals('maj', { ninth: true })).toEqual([0, 4, 7, 14]); // add9
     expect(chordIntervals('maj7', { ninth: true })).toEqual([0, 4, 7, 11, 14]); // maj9
-    expect(chordIntervals('dom7', { sus: 4, ninth: true })).toEqual([0, 5, 7, 10, 14]); // 9sus4
+    expect(chordIntervals('dom7', { sus4: true, ninth: true })).toEqual([0, 5, 7, 10, 14]); // 9sus4
   });
 
   it('skips a 9th that sus2 already supplies (same pitch class)', () => {
-    expect(chordIntervals('maj', { sus: 2, ninth: true })).toEqual([0, 2, 7]);
+    expect(chordIntervals('maj', { sus2: true, ninth: true })).toEqual([0, 2, 7]);
   });
 
   it('modifiers reach the sounding pitches', () => {
@@ -226,22 +230,101 @@ describe('chord modifiers', () => {
 
   it('state keys ignore modifiers, so the model sees the plain chord', () => {
     const plain = stateKey({ degree: 7, quality: 'dom7' });
-    expect(stateKey({ degree: 7, quality: 'dom7', mods: { sus: 4, ninth: true } })).toBe(plain);
+    expect(stateKey({ degree: 7, quality: 'dom7', mods: { sus4: true, ninth: true } })).toBe(plain);
   });
 
   it('toAbsolute/toRelative carry modifiers through', () => {
-    const rel = { degree: 7, quality: 'dom7' as ChordQuality, mods: { sus: 4 as const } };
+    const rel = { degree: 7, quality: 'dom7' as ChordQuality, mods: { sus4: true as const } };
     const abs = toAbsolute(rel, cMajorKey);
-    expect(abs.mods).toEqual({ sus: 4 });
+    expect(abs.mods).toEqual({ sus4: true });
     expect(toRelative(abs, cMajorKey)).toEqual(rel);
   });
 
   it('reports the shape a name renderer needs', () => {
-    expect(chordShape('dom7', { sus: 4, ninth: true })).toEqual({
+    expect(chordShape('dom7', { sus4: true, ninth: true })).toEqual({
       third: 'sus4',
       seventh: 'b7',
+      sixth: false,
       ninth: true,
+      eleventh: false,
+      thirteenth: false,
     });
-    expect(chordShape('min')).toEqual({ third: 'min', seventh: null, ninth: false });
+    expect(chordShape('min')).toEqual({
+      third: 'min',
+      seventh: null,
+      sixth: false,
+      ninth: false,
+      eleventh: false,
+      thirteenth: false,
+    });
+  });
+
+  it('lets sus2 and sus4 combine: both replace the third', () => {
+    expect(chordIntervals('maj', { sus2: true, sus4: true })).toEqual([0, 2, 5, 7]);
+    expect(chordShape('maj', { sus2: true, sus4: true }).third).toBe('sus2/4');
+  });
+
+  it('stacks 11ths and 13ths, skipping tones the chord already has', () => {
+    expect(chordIntervals('dom7', { ninth: true, eleventh: true })).toEqual([0, 4, 7, 10, 14, 17]);
+    expect(chordIntervals('dom7', { thirteenth: true })).toEqual([0, 4, 7, 10, 21]);
+    // sus4 *is* the 11th an octave down, so the extension adds nothing.
+    expect(chordIntervals('dom7', { sus4: true, eleventh: true })).toEqual([0, 5, 7, 10]);
+  });
+
+  it('spells an unbroken stack by its top note, and anything else as added', () => {
+    const spell = (mods: Parameters<typeof chordShape>[1]) =>
+      extensionSpelling(chordShape('dom7', mods));
+    expect(spell({ ninth: true })).toEqual({ stack: 9, added: [], sixth: false });
+    expect(spell({ ninth: true, eleventh: true })).toEqual({ stack: 11, added: [], sixth: false });
+    expect(spell({ ninth: true, eleventh: true, thirteenth: true })).toEqual({
+      stack: 13,
+      added: [],
+      sixth: false,
+    });
+    // A 13th chord implies the 11th, so 9 + 13 still spells 13.
+    expect(spell({ ninth: true, thirteenth: true })).toEqual({
+      stack: 13,
+      added: [],
+      sixth: false,
+    });
+    // Over a seventh, a 6th is the 13th.
+    expect(spell({ ninth: true, sixth: true })).toEqual({ stack: 13, added: [], sixth: false });
+    // Without the 9th there is no stack to continue: these are added tones.
+    expect(spell({ eleventh: true })).toEqual({ stack: null, added: [11], sixth: false });
+    expect(spell({ thirteenth: true })).toEqual({ stack: null, added: [13], sixth: false });
+    // No seventh, no stack at all — and a 6th stays a 6th.
+    expect(extensionSpelling(chordShape('maj', { ninth: true }))).toEqual({
+      stack: null,
+      added: [9],
+      sixth: false,
+    });
+    expect(extensionSpelling(chordShape('maj', { sixth: true }))).toEqual({
+      stack: null,
+      added: [],
+      sixth: true,
+    });
+  });
+
+  it('adds the key’s own seventh, falling back to the triad’s where the key has none', () => {
+    const cMajor: Key = { tonic: 0, scale: 'ionian' };
+    expect(withSeventh({ degree: 7, quality: 'maj' }, cMajor).quality).toBe('dom7'); // V7
+    expect(withSeventh({ degree: 0, quality: 'maj' }, cMajor).quality).toBe('maj7'); // Imaj7
+    expect(withSeventh({ degree: 2, quality: 'min' }, cMajor).quality).toBe('min7'); // ii7
+    // bVII isn't diatonic to C major: the major triad implies a dominant 7th.
+    expect(withSeventh({ degree: 10, quality: 'maj' }, cMajor).quality).toBe('dom7');
+    // Already a 7th chord, or with no representable 7th: unchanged.
+    expect(withSeventh({ degree: 7, quality: 'dom7' }, cMajor).quality).toBe('dom7');
+    expect(withSeventh({ degree: 0, quality: 'aug' }, cMajor).quality).toBe('aug');
+  });
+
+  it('strips a seventh back to its triad, preserving modifiers', () => {
+    expect(withoutSeventh({ degree: 7, quality: 'dom7', mods: { ninth: true } })).toEqual({
+      degree: 7,
+      quality: 'maj',
+      mods: { ninth: true },
+    });
+    expect(withoutSeventh({ degree: 0, quality: 'maj' }).quality).toBe('maj'); // already a triad
+    expect(hasSeventh('m7b5')).toBe(true);
+    expect(hasSeventh('sus2')).toBe(false);
   });
 });

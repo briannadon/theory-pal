@@ -5,13 +5,13 @@ A browser-based chord progression assistant: select a key and scale, get corpus-
 ## Features
 
 - **Key and scale selection**: Major, minor, harmonic minor, melodic minor, and all seven diatonic modes.
-- **In-key chord modifiers**: Stack sus2/sus4 (mutually exclusive), 7, and 9 onto the "In key" row; every diatonic chord re-renders with the modifiers applied.
+- **Stackable chord modifiers**: sus2, sus4, 6, 7, 9, 11 and 13, freely combinable. Apply them to the whole "In key" row at once, or to a single chord in the grid via the `mods` popover on its tile. Chord symbols and roman numerals follow lead-sheet convention: an unbroken stack is named by its top note (C13), anything else reads as an added tone (C7(add13)).
 - **Corpus-driven suggestions**: Next-chord recommendations ranked by probability, trained on a real chord progression corpus with an Order-3 Markov model and theory-rule fallback.
 - **Non-diatonic chords**: Borrowed chords, secondary dominants, and modal mixture are always available, not filtered out.
 - **Built-in piano sound**: Audition chords with Web Audio and a SoundFont player. Samples load on page open, so the first chord you click sounds immediately.
 - **Live MIDI output**: Send chord progressions to a DAW or hardware synthesizer via Web MIDI, with chords and melody on separate MIDI channels so they can drive different instruments.
 - **Separate chord and melody levels**: Independent faders for the two parts, applied to the piano's own output channels and sent as MIDI channel volume.
-- **Progression grid & direct chord editing**: Drag chords into a 4/8/16-slot grid, modify individual chord qualities directly via inline selectors (triads, 7ths, sus, add9 and 9th chords), reorder slots, and hear the result.
+- **Progression grid & direct chord editing**: Drag chords into a 4/8/16-slot grid, restyle any chord in place with the modifier popover, reorder slots, and hear the result.
 - **Arpeggiator**: Play each bar as block chords or an arpeggio (up, down, up-down, down-up, random) at 1/4 through 1/16, including triplets.
 - **Melody lane**: A piano-roll editor under the grid, with rows tinted by what each pitch means against the chord in that bar (chord tone, other scale tone, off-scale). Drag to draw a note as long as the drag, drag a note to move it, drag its right edge to lengthen. Alt-click a note to delete it, or Alt-drag a box to delete everything it touches. Hovering a bar — in the lane or its chord tile above — resolves the lane to that chord: its tones light up, the key's other scale tones sit behind them in grey, everything else recedes.
 - **Procedural melody generation**: Generate a singable melody over the progression, with a single "surprise" slider that unlocks liberties in stages. Pitch choice ports Temperley's RPK model of melody perception (range, pitch proximity, and corpus key profiles, fit to the Essen Folksong Collection); harmony and rhythm rules sit on top. Not corpus-trained: the Chordonomicon data is chords only.

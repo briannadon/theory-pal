@@ -11,7 +11,7 @@ see "Where the UI left off").
 ## Where things stand
 
 M0 through M3 are done except for the spikes that need the user's hardware and the UI
-wiring. 206 tests pass, `npx tsc --noEmit` is clean, and the deploy pipeline is green
+wiring. 228 tests pass, `npx tsc --noEmit` is clean, and the deploy pipeline is green
 end to end.
 
 | Milestone | State |
@@ -177,7 +177,7 @@ Still unaddressed from the list above: vendored soundfont and self-hosted fonts,
 
 ```bash
 npm run dev                # dev server
-npx vitest run             # 206 tests
+npx vitest run             # 228 tests
 npx tsc --noEmit           # typecheck
 npm run build              # production build
 cd data && uv run pytest -q # 20 pipeline tests

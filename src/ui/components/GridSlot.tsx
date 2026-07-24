@@ -1,56 +1,10 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { chordName, type ChordMods, type ChordQuality, type RelChord } from '../../theory/index.ts';
+import { useEffect, useRef, useState } from 'react';
+import type { Key, RelChord } from '../../theory/index.ts';
+import { modifierState, toggleModifier } from '../logic/chordMods.ts';
 import { ChordFace, type ChordAccent } from './ChordFace.tsx';
-
-// The qualities a slot can be switched to by hand. 9ths are not members of
-// ChordQuality — they are a base quality plus `mods.ninth` (see SPEC.md) — so
-// an option carries both, and its stored value encodes both.
-//
-// Labels are derived rather than typed out: `chordName` on a C root gives the
-// exact chord-symbol suffix the tile itself displays, so the dropdown can
-// never drift out of step with the face above it.
-interface QualityOption {
-  value: string;
-  label: string;
-  quality: ChordQuality;
-  mods?: ChordMods;
-}
-
-const NINTH: ChordMods = { ninth: true };
-
-function optionValue(quality: ChordQuality, mods?: ChordMods): string {
-  return mods?.ninth ? `${quality}+9` : quality;
-}
-
-function option(quality: ChordQuality, mods?: ChordMods): QualityOption {
-  const symbol = chordName({ root: 0, quality, mods }).slice(1); // drop the "C"
-  return { value: optionValue(quality, mods), label: symbol || 'maj', quality, mods };
-}
-
-const QUALITY_OPTIONS: QualityOption[] = [
-  option('maj'),
-  option('min'),
-  option('dom7'),
-  option('maj7'),
-  option('min7'),
-  option('m7b5'),
-  option('dim7'),
-  option('minMaj7'),
-  option('sus2'),
-  option('sus4'),
-  option('dom7sus4'),
-  option('dim'),
-  option('aug'),
-  // Added tones and true 9ths, in the same order as their base qualities.
-  option('maj', NINTH), // add9
-  option('min', NINTH), // m(add9)
-  option('dom7', NINTH), // 9
-  option('maj7', NINTH), // maj9
-  option('min7', NINTH), // m9
-  option('m7b5', NINTH), // m9b5
-  option('dom7sus4', NINTH), // 9sus4
-];
+import { ModifierBar, type ChordModifier } from './ModifierBar.tsx';
 
 export interface GridSlotProps {
   id: string;
@@ -62,7 +16,9 @@ export interface GridSlotProps {
   isPlaying: boolean;
   onAudition: () => void;
   onClear: () => void;
-  onModifyQuality?: (quality: ChordQuality, mods?: ChordMods) => void;
+  /** The key decides what "add the 7th" means for this degree. */
+  keyValue: Key;
+  onModifyChord?: (chord: RelChord) => void;
   /** Hovering a chord tile resolves the melody lane to that chord — see
    * MelodyLane. Reported here rather than derived there so both the tile and
    * the lane's own bar segment drive the same highlight. */
@@ -79,9 +35,31 @@ export function GridSlot({
   isPlaying,
   onAudition,
   onClear,
-  onModifyQuality,
+  keyValue,
+  onModifyChord,
   onHoverChange,
 }: GridSlotProps) {
+  const [modsOpen, setModsOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Click anywhere else — including another slot's button — closes this one.
+  // Pointerdown rather than click so the popover is gone before whatever was
+  // clicked reacts, and Escape for the keyboard.
+  useEffect(() => {
+    if (!modsOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!popoverRef.current?.contains(e.target as Node)) setModsOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setModsOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [modsOpen]);
   // Slot ids/keys are positional (`slot-0`…`slot-n`), so a reorder moves the
   // chord *content* between DOM nodes that themselves never move. dnd-kit's
   // default layout animation doesn't know that: on drop it measures the "new"
@@ -95,7 +73,6 @@ export function GridSlot({
     animateLayoutChanges: () => false,
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
-  const currentValue = chord ? optionValue(chord.quality, chord.mods) : '';
 
   return (
     <div
@@ -129,34 +106,33 @@ export function GridSlot({
           ×
         </button>
       )}
-      {chord && onModifyQuality && (
-        <select
-          className="grid-slot__quality-select"
-          value={currentValue}
-          aria-label={`Modify quality for bar ${index + 1}`}
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-          onChange={(e) => {
-            e.stopPropagation();
-            const picked = QUALITY_OPTIONS.find((o) => o.value === e.target.value);
-            if (picked) onModifyQuality(picked.quality, picked.mods);
-          }}
-        >
-          {/* A chord dragged in with modifiers the list doesn't cover (a sus'd
-              7th, say) still has to show what it is, so it gets a disabled
-              entry of its own rather than silently reading as its base
-              quality. */}
-          {!QUALITY_OPTIONS.some((o) => o.value === currentValue) && (
-            <option value={currentValue} disabled>
-              {chordName({ root: 0, quality: chord.quality, mods: chord.mods }).slice(1) || 'maj'}
-            </option>
+      {chord && onModifyChord && (
+        <div className="grid-slot__mods" ref={popoverRef}>
+          <button
+            type="button"
+            className="grid-slot__mods-btn"
+            aria-expanded={modsOpen}
+            aria-label={`Modifiers for bar ${index + 1}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setModsOpen((open) => !open);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            mods
+          </button>
+          {modsOpen && (
+            <div className="grid-slot__popover" onPointerDown={(e) => e.stopPropagation()}>
+              <ModifierBar
+                value={modifierState(chord)}
+                onToggle={(modifier: ChordModifier) =>
+                  onModifyChord(toggleModifier(chord, keyValue, modifier))
+                }
+                ariaLabel={`Modifiers for bar ${index + 1}`}
+              />
+            </div>
           )}
-          {QUALITY_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        </div>
       )}
       <span className="grid-slot__index">{index + 1}</span>
     </div>

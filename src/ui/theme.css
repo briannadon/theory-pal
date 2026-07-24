@@ -797,28 +797,52 @@
   background: var(--bg-3);
 }
 
-.grid-slot__quality-select {
-  box-sizing: border-box;
-  width: 100%;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.2;
-  color: var(--ink-dim);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 4px 6px;
-  cursor: pointer;
-  transition:
-    background 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease;
+/* The modifier popover: a small "mods" button under each filled slot that
+   opens the same toggle bar the in-key strip uses. */
+.grid-slot__mods {
+  position: relative;
 }
 
-.grid-slot__quality-select:hover {
+.grid-slot__mods-btn {
+  all: unset;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 3px 0;
+}
+
+.grid-slot__mods-btn:hover,
+.grid-slot__mods-btn[aria-expanded='true'] {
   color: var(--ink);
   background: var(--bg-3);
-  border-color: var(--accent-surprise);
+}
+
+.grid-slot__popover {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+.grid-slot__popover .tp-size-group {
+  border: none;
+  background: transparent;
+  padding: 0;
+  flex-wrap: nowrap;
 }
 
 .grid-slot__index {

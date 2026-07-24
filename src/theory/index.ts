@@ -16,6 +16,10 @@ export {
   chordPitches,
   chordIntervals,
   chordShape,
+  extensionSpelling,
+  hasSeventh,
+  withSeventh,
+  withoutSeventh,
 } from './chords.ts';
 
 export { noteName, chordName } from './pitch.ts';
