@@ -1,0 +1,715 @@
+/* theory-pal design tokens and component styles.
+ *
+ * Direction: a dark, instrument-panel interface — closer to a hardware synth
+ * than a SaaS dashboard. Chord cells read as backlit keycaps/pads: a thin
+ * top-edge accent line reports diatonic/borrowed/surprise status at a
+ * glance (the app's core "identify borrowed chords instantly" requirement),
+ * and probability is a small level-meter bar under the numeral rather than
+ * a shouted badge — legible without competing with the chord symbol itself.
+ * Committed to one dark theme rather than following OS light/dark
+ * preference: a piece of instrument gear doesn't retheme itself either.
+ */
+
+:root {
+  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --bg-0: #0a0b0f;
+  --bg-1: #14161d;
+  --bg-2: #1c1f29;
+  --bg-3: #262a37;
+  --line: #2b2f3d;
+  --line-soft: #1f222c;
+
+  --ink: #edecf6;
+  --ink-dim: #9498ab;
+  --ink-faint: #5b5f70;
+
+  --accent-diatonic: #52e6c1;
+  --accent-diatonic-bg: rgba(82, 230, 193, 0.12);
+  --accent-borrowed: #ff9d5c;
+  --accent-borrowed-bg: rgba(255, 157, 92, 0.14);
+  --accent-surprise: #9497ff;
+  --accent-surprise-bg: rgba(148, 151, 255, 0.14);
+  --accent-danger: #ff6b6b;
+
+  --focus-ring: #9497ff;
+  --radius: 6px;
+  --radius-lg: 10px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.tp-app {
+  min-height: 100svh;
+  background: var(--bg-0);
+  color: var(--ink);
+  font-family: var(--font-display);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px clamp(14px, 3vw, 40px) 96px;
+}
+
+/* focus ring, applied consistently to every interactive control */
+.tp-app :is(button, select, input, a):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tp-app * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Header + key picker                                                    */
+/* ---------------------------------------------------------------------- */
+
+.tp-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 28px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tp-header__brand {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.tp-header__brand-mark {
+  color: var(--accent-surprise);
+}
+
+.tp-key-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tp-key-picker__label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-faint);
+}
+
+.tp-tonics {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-1);
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+}
+
+.tp-tonic-btn {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-dim);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  padding: 6px 9px;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.tp-tonic-btn:hover {
+  color: var(--ink);
+  background: var(--bg-2);
+}
+
+.tp-tonic-btn[aria-pressed='true'] {
+  background: var(--accent-surprise);
+  color: #10111a;
+}
+
+.tp-scale-select {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  cursor: pointer;
+  max-width: 260px;
+}
+
+.tp-model-badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--ink-faint);
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.tp-model-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ink-faint);
+  flex: none;
+}
+
+.tp-model-badge--loading .tp-model-badge__dot {
+  background: var(--accent-surprise);
+  animation: tp-pulse 1.1s ease-in-out infinite;
+}
+
+.tp-model-badge--corpus .tp-model-badge__dot {
+  background: var(--accent-diatonic);
+}
+
+.tp-model-badge--corpus {
+  color: var(--accent-diatonic);
+  border-color: color-mix(in srgb, var(--accent-diatonic) 40%, var(--line));
+}
+
+.tp-model-badge--prior {
+  color: var(--ink-dim);
+}
+
+@keyframes tp-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Strips (diatonic + suggestions) — shared layout                        */
+/* ---------------------------------------------------------------------- */
+
+.tp-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.tp-strip__header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.tp-strip__eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+}
+
+.tp-strip__hint {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.tp-strip__cells {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Chord face — the visual centerpiece                                    */
+/* ---------------------------------------------------------------------- */
+
+.strip-cell {
+  all: unset;
+  cursor: grab;
+  flex: none;
+  touch-action: none;
+}
+
+.strip-cell:active {
+  cursor: grabbing;
+}
+
+.strip-cell--dragging {
+  opacity: 0.35;
+}
+
+.chord-face {
+  position: relative;
+  width: 104px;
+  min-height: 84px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 2px;
+  transition:
+    transform 0.08s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.strip-cell:hover .chord-face,
+.grid-slot__body:hover .chord-face {
+  background: var(--bg-3);
+}
+
+.strip-cell:active .chord-face {
+  transform: scale(0.97);
+}
+
+.chord-face--diatonic {
+  border-top-color: var(--accent-diatonic);
+}
+
+.chord-face--borrowed {
+  border-top-color: var(--accent-borrowed);
+}
+
+.chord-face--surprise {
+  border-top-color: var(--accent-surprise);
+  border-style: dashed;
+  background: var(--accent-surprise-bg);
+}
+
+.chord-face--empty {
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  background: transparent;
+}
+
+.chord-face__roman {
+  font-family: var(--font-mono);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.chord-face__name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.chord-face__placeholder {
+  font-size: 20px;
+  color: var(--ink-faint);
+}
+
+.chord-face__prob {
+  width: 100%;
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.chord-face__prob-bar-track {
+  width: 100%;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.chord-face__prob-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ink-faint);
+}
+
+.chord-face--diatonic .chord-face__prob-bar {
+  background: var(--accent-diatonic);
+}
+
+.chord-face--borrowed .chord-face__prob-bar {
+  background: var(--accent-borrowed);
+}
+
+.chord-face--surprise .chord-face__prob-bar {
+  background: var(--accent-surprise);
+}
+
+.chord-face__prob-text {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
+.chord-face__corpus-mark {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--ink-faint);
+}
+
+.chord-face__corpus-mark[data-corpus='true'] {
+  background: var(--accent-diatonic);
+}
+
+.tp-reroll-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  all: unset;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--ink-dim);
+  padding: 3px;
+  border-radius: 4px;
+}
+
+.tp-reroll-btn:hover {
+  color: var(--ink);
+  background: var(--bg-3);
+}
+
+.tp-surprise-label {
+  position: absolute;
+  bottom: 6px;
+  right: 8px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-surprise);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Progression grid                                                       */
+/* ---------------------------------------------------------------------- */
+
+.tp-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.tp-grid__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tp-size-group {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 3px;
+}
+
+.tp-size-btn {
+  all: unset;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-dim);
+  padding: 5px 10px;
+  border-radius: 4px;
+}
+
+.tp-size-btn:hover {
+  color: var(--ink);
+}
+
+.tp-size-btn[aria-pressed='true'] {
+  background: var(--bg-3);
+  color: var(--ink);
+}
+
+.tp-grid__cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+}
+
+.grid-slot {
+  position: relative;
+  touch-action: none;
+}
+
+.grid-slot--dragging {
+  opacity: 0.35;
+}
+
+.grid-slot__body {
+  all: unset;
+  display: block;
+  width: 100%;
+  cursor: grab;
+}
+
+.grid-slot__body:disabled {
+  cursor: default;
+}
+
+.grid-slot__body .chord-face {
+  width: 100%;
+  min-height: 72px;
+}
+
+.grid-slot--playing .chord-face {
+  border-color: var(--accent-surprise);
+  box-shadow: 0 0 0 1px var(--accent-surprise);
+}
+
+.grid-slot__clear {
+  all: unset;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 999px;
+  color: var(--ink-faint);
+  font-size: 13px;
+}
+
+.grid-slot__clear:hover {
+  color: var(--accent-danger);
+  background: var(--bg-3);
+}
+
+.grid-slot__index {
+  position: absolute;
+  bottom: 4px;
+  left: 7px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Transport                                                               */
+/* ---------------------------------------------------------------------- */
+
+.tp-transport {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 12px clamp(14px, 3vw, 40px);
+  background: var(--bg-1);
+  border-top: 1px solid var(--line);
+  z-index: 10;
+}
+
+.tp-transport__play {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--accent-surprise);
+  color: #10111a;
+  font-size: 15px;
+  flex: none;
+}
+
+.tp-transport__play:hover {
+  filter: brightness(1.08);
+}
+
+.tp-transport__group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.tp-transport__group label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tp-tempo-input {
+  width: 56px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+.tp-toggle {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  padding: 5px 9px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+
+.tp-toggle[aria-pressed='true'] {
+  color: var(--accent-diatonic);
+  border-color: color-mix(in srgb, var(--accent-diatonic) 45%, var(--line));
+  background: var(--accent-diatonic-bg);
+}
+
+.tp-transport__spacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+
+.tp-midi-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  position: relative;
+}
+
+.tp-midi-picker__select {
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 5px 7px;
+  max-width: 160px;
+}
+
+.tp-btn {
+  all: unset;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 7px 12px;
+  white-space: nowrap;
+}
+
+.tp-btn:hover {
+  background: var(--bg-3);
+}
+
+.tp-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tp-btn--accent {
+  background: var(--accent-diatonic);
+  color: #0a1310;
+  border-color: transparent;
+}
+
+.tp-btn--accent:hover {
+  filter: brightness(1.06);
+}
+
+.tp-midi-hint {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 232px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ink-dim);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+
+.tp-midi-status {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.tp-midi-status--denied {
+  color: var(--accent-borrowed);
+}
+
+.tp-midi-status--granted {
+  color: var(--accent-diatonic);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Narrow layouts                                                          */
+/* ---------------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  .tp-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .tp-model-badge {
+    margin-left: 0;
+  }
+
+  .tp-transport {
+    justify-content: flex-start;
+  }
+
+  .tp-grid__cells {
+    grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  }
+}

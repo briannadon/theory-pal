@@ -1,7 +1,9 @@
 # theory-pal: chord progression assistant (web app)
 
-Status: planned, decisions confirmed with user 2026-07-23. Written for handoff to a
-build agent. Remaining open questions at the bottom.
+Status: partially built 2026-07-23. theory/, model/, audio/, midi/, and the data
+pipeline are done and committed; the UI is written but unwired. **See HANDOFF.md for
+current state, verification numbers, and what to do next.** This file remains the
+scope and rationale document, and its milestone list below is annotated with status.
 
 Direction change from earlier drafts: this was originally scoped as a Rust
 nih-plug CLAP plugin. User chose a web-first, TypeScript-only build after weighing
@@ -154,20 +156,23 @@ end-to-end before running the full corpus.
 
 ## Milestones
 
-- M0 (half a day): spikes that kill the risky assumptions. (a) Web MIDI from Firefox
-  into Reaper via a virtual ALSA/JACK port on CachyOS: create the port first, confirm
-  the site-permission add-on prompt appears on a deployed origin (localhost skips it),
-  and check latency is tolerable. (b) SoundFont playback: pick spessasynth vs smplr by
-  testing a chord audition in Firefox. (c) Smoke-test Chromium as the secondary
-  browser.
-- M1: `theory/` with vitest coverage. Throwaway page: pick "A harmonic minor", see the
-  diatonic chords, click to hear them voiced through the piano.
-- M2: data pipeline + `model/`. Dev harness: give it `i - iv`, get ranked next chords
-  with percentages. Validate against Hooktheory Trends for major/minor.
-- M3: real UI. Key picker, diatonic strip, suggestion strip with percentages and
-  surprise slot, click-to-audition, MIDI port picker with live send.
-- M4: grid, drag-and-drop, playback with loop, .mid export. Deploy to GitHub Pages
-  (project site under briannadon.github.io, gh-pages Action, Vite base path).
+- M0 (half a day). **NOT RUN, needs the user's hardware.** Checklist written up in
+  `docs/M0-spikes.md`. (a) Web MIDI from Firefox into Reaper via a virtual ALSA/JACK
+  port on CachyOS: create the port first, confirm the site-permission add-on prompt
+  appears on a deployed origin (localhost skips it), and check latency is tolerable.
+  (b) SoundFont playback: `smplr` was chosen by default and is wired up, but nobody has
+  listened to it yet. (c) Smoke-test Chromium as the secondary browser.
+- M1. **DONE** (commit 14c24b0). `theory/` with 45 tests, 21 scales, voice leading.
+- M2. **DONE** (commits 9ecf6ef, 99c81a7). Pipeline validated at 74.2% tonic / 89.0%
+  mode accuracy against McGill Billboard; model trained on a 15k-song sample; harness
+  output checked by hand. Hooktheory validation was not done. The Billboard
+  annotations served the same purpose.
+- M3. **PARTIAL, uncommitted.** Key picker, both strips, chord cells, hooks, and the
+  tested grid/context logic exist in `src/ui/`. No grid container, transport, MIDI port
+  picker, or App wiring yet; `src/App.tsx` is still the Vite scaffold.
+- M4. **NOT STARTED**, except that grid slot and reorder logic is written and tested.
+  Deploy is done and green ahead of schedule: Pages is enabled, the Action builds and
+  publishes on push, and the site is live.
 - M5 (first post-MVP work, in priority order): extended chords (9ths first, then
   11/13/add) surfaced in strips, grid, and voicing; suggestion blend tuning; strum/arp
   patterns; progression save/share (URL-encoded state is enough, still no backend).
@@ -210,6 +215,10 @@ webview-based plugin framework. Not planned; noted so module boundaries stay cle
 
 ## Open questions
 
-None blocking. Everything previously open is resolved in the decisions list above.
-Remaining choices (spessasynth vs smplr, exact blend weights, code license text) are
-build-time calls for the implementing agent, with defaults already stated.
+None blocking at plan level. The build-time calls have been made: `smplr` for audio,
+MIT for the code license, blend weights set and documented in `src/model/constants.ts`.
+
+Two compromises taken during the build that were not in this plan, both recorded in
+HANDOFF.md: the piano samples and the UI fonts are fetched from third-party hosts
+rather than served from this repo. PLAN.md intended a vendored, trimmed soundfont.
+Worth correcting before calling the project finished.
