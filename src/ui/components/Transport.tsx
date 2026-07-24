@@ -1,7 +1,22 @@
 // Transport bar: Play/Stop controls, BPM input, Loop toggle, Piano toggle,
 // Web MIDI port picker (request access on user click only), and Export .mid button.
+import type { ArpPattern, ArpRate, BarStyle } from '../../theory/index.ts';
 import type { MidiPort } from '../../midi/index.ts';
 import type { MidiAccessStatus } from '../hooks/useMidiOut.ts';
+
+// Playing styles offered in the transport. `sustain` is deliberately absent:
+// it exists for .mid export (whole-bar chords) and reads as "nothing is
+// happening" when auditioning.
+const PATTERNS: { value: ArpPattern; label: string }[] = [
+  { value: 'block', label: 'Block' },
+  { value: 'up', label: 'Arp up' },
+  { value: 'down', label: 'Arp down' },
+  { value: 'updown', label: 'Arp up-down' },
+  { value: 'downup', label: 'Arp down-up' },
+  { value: 'random', label: 'Arp random' },
+];
+
+const RATES: ArpRate[] = ['1/4', '1/8', '1/16', '1/8t', '1/16t'];
 
 export interface TransportProps {
   isPlaying: boolean;
@@ -12,6 +27,8 @@ export interface TransportProps {
   onToggleLoop: () => void;
   isPianoEnabled: boolean;
   onTogglePiano: () => void;
+  style: BarStyle;
+  onStyleChange: (style: BarStyle) => void;
   midiStatus: MidiAccessStatus;
   midiPorts: MidiPort[];
   selectedMidiPortId: string | null;
@@ -30,6 +47,8 @@ export function Transport({
   onToggleLoop,
   isPianoEnabled,
   onTogglePiano,
+  style,
+  onStyleChange,
   midiStatus,
   midiPorts,
   selectedMidiPortId,
@@ -84,6 +103,34 @@ export function Transport({
       >
         🎹 Piano
       </button>
+
+      <div className="tp-transport__group">
+        <select
+          className="tp-midi-picker__select"
+          value={style.pattern}
+          aria-label="Chord playing style"
+          onChange={(e) => onStyleChange({ ...style, pattern: e.target.value as ArpPattern })}
+        >
+          {PATTERNS.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="tp-midi-picker__select"
+          value={style.rate}
+          aria-label="Arpeggio rate"
+          disabled={style.pattern === 'block'}
+          onChange={(e) => onStyleChange({ ...style, rate: e.target.value as ArpRate })}
+        >
+          {RATES.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div className="tp-transport__spacer" />
 

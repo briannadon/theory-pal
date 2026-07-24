@@ -33,6 +33,12 @@
   --accent-surprise-bg: rgba(148, 151, 255, 0.14);
   --accent-danger: #ff6b6b;
 
+  /* Melody lane row tints: chord tone, other scale tone, off-scale. Kept
+     dark enough that the note blocks and the chord accents stay dominant. */
+  --lane-chord: rgba(82, 230, 193, 0.16);
+  --lane-scale: rgba(148, 151, 255, 0.07);
+  --lane-off: #101219;
+
   --focus-ring: #9497ff;
   --radius: 6px;
   --radius-lg: 10px;
@@ -503,6 +509,89 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--accent-surprise);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Melody lane                                                            */
+/* ---------------------------------------------------------------------- */
+
+.tp-lane__scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.tp-lane__surface {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-1);
+  overflow: hidden;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.tp-lane__row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+/* Octave markers: the tonic row reads as the lane's ruler. */
+.tp-lane__row--tonic {
+  border-bottom-color: var(--line);
+  box-shadow: inset 0 0 0 9999px rgba(255, 255, 255, 0.02);
+}
+
+.tp-lane__barline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--line);
+  pointer-events: none;
+}
+
+.tp-lane__barline--playing {
+  background: rgba(148, 151, 255, 0.08);
+}
+
+.tp-lane__note {
+  position: absolute;
+  border-radius: 3px;
+  background: var(--accent-diatonic);
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  /* The right edge is the resize grip — hinted with a darker cap. */
+  box-shadow: inset -3px 0 0 rgba(0, 0, 0, 0.25);
+  cursor: grab;
+}
+
+.tp-lane__note--active {
+  background: var(--accent-surprise);
+  cursor: grabbing;
+}
+
+.tp-lane__slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-faint);
+}
+
+.tp-lane__slider input[type='range'] {
+  width: 110px;
+  accent-color: var(--accent-surprise);
+}
+
+.tp-lane__slider-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+  min-width: 34px;
 }
 
 /* ---------------------------------------------------------------------- */

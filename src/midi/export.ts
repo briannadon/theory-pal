@@ -8,25 +8,43 @@
 // sounds like what the grid's own audition would play, rather than flat
 // root-position triads.
 import { writeMidi, type MidiData, type MidiEvent } from 'midi-file';
-import { voiceProgression, type AbsChord } from '../theory/index.ts';
+import {
+  renderBar,
+  voiceProgression,
+  type AbsChord,
+  type BarStyle,
+  type NoteEvent,
+} from '../theory/index.ts';
 
 const TICKS_PER_BEAT = 480;
 const BEATS_PER_BAR = 4; // one chord per bar, 4/4 — SPEC.md / PLAN.md v1 scope
 const TICKS_PER_BAR = TICKS_PER_BEAT * BEATS_PER_BAR;
-const NOTE_VELOCITY = 100;
 
 interface RawNoteEvent {
   tick: number;
   on: boolean;
   note: number;
+  velocity: number;
 }
+
+export interface ExportOptions {
+  /** How each bar is played. Defaults to one sustained chord per bar, which
+   * is what export has always written; pass the transport's live style to
+   * export arpeggios instead. */
+  style?: BarStyle;
+  /** Melody notes per bar, in beats from that bar's start (theory/pattern.ts). */
+  melody?: (NoteEvent[] | null)[];
+}
+
+// Whole-bar chords: the historical export behavior, and still the default.
+const SUSTAIN_STYLE: BarStyle = { pattern: 'sustain', rate: '1/4' };
 
 /**
  * Render `bars` (one `AbsChord` per bar-slot, `null` = a silent bar) to a
  * Standard MIDI File — format 0, single track, tempo set from `bpm`. Returns
  * a Blob the UI can hand to a download link.
  */
-export function exportMidiFile(bars: (AbsChord | null)[], bpm: number): Blob {
+export function exportMidiFile(bars: (AbsChord | null)[], bpm: number, opts?: ExportOptions): Blob {
   const microsecondsPerBeat = Math.round(60_000_000 / bpm);
 
   // Voice only the real chords (in order), so voice-leading treats gaps as
@@ -44,15 +62,27 @@ export function exportMidiFile(bars: (AbsChord | null)[], bpm: number): Blob {
   const notesByBar = new Map<number, number[]>();
   chordIndices.forEach((barIndex, i) => notesByBar.set(barIndex, voiced[i].notes));
 
+  // Chords and melody both come through `renderBar`'s NoteEvent form, so the
+  // exported file is the same material playback schedules — an arpeggio or a
+  // lead line exports without a second code path here.
+  const style = opts?.style ?? SUSTAIN_STYLE;
   const rawEvents: RawNoteEvent[] = [];
-  for (const [barIndex, notes] of notesByBar) {
-    const startTick = barIndex * TICKS_PER_BAR;
-    const endTick = startTick + TICKS_PER_BAR;
-    for (const note of notes) {
-      rawEvents.push({ tick: startTick, on: true, note });
-      rawEvents.push({ tick: endTick, on: false, note });
+  const emit = (barIndex: number, events: NoteEvent[]) => {
+    const barStart = barIndex * TICKS_PER_BAR;
+    for (const ev of events) {
+      const startTick = barStart + Math.round(ev.startBeat * TICKS_PER_BEAT);
+      const endTick = startTick + Math.round(ev.durationBeats * TICKS_PER_BEAT);
+      rawEvents.push({ tick: startTick, on: true, note: ev.note, velocity: ev.velocity });
+      rawEvents.push({ tick: endTick, on: false, note: ev.note, velocity: 0 });
     }
+  };
+
+  for (const [barIndex, notes] of notesByBar) {
+    emit(barIndex, renderBar({ notes }, style, BEATS_PER_BAR));
   }
+  opts?.melody?.forEach((events, barIndex) => {
+    if (events && events.length > 0) emit(barIndex, events);
+  });
   // Stable, deterministic order: by tick, note-offs before note-ons at the
   // same tick (so a note ending exactly when another with the same number
   // begins doesn't produce an overlapping on/on or an out-of-order off after
@@ -81,7 +111,7 @@ export function exportMidiFile(bars: (AbsChord | null)[], bpm: number): Blob {
       channel: 0,
       type: ev.on ? 'noteOn' : 'noteOff',
       noteNumber: ev.note,
-      velocity: ev.on ? NOTE_VELOCITY : 0,
+      velocity: ev.on ? ev.velocity : 0,
     });
   }
 

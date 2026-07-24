@@ -11,7 +11,7 @@ see "Where the UI left off").
 ## Where things stand
 
 M0 through M3 are done except for the spikes that need the user's hardware and the UI
-wiring. 157 tests pass, `npx tsc --noEmit` is clean, and the deploy pipeline is green
+wiring. 190 tests pass, `npx tsc --noEmit` is clean, and the deploy pipeline is green
 end to end.
 
 | Milestone | State |
@@ -147,6 +147,23 @@ Four changes, all committed and pushed to `master`:
   default layout animation replayed the reorder the drag preview had already shown;
   `animateLayoutChanges: () => false` on the sortable settles it in place.
 
+- **Arpeggios, a melody lane, and a melody generator.** `theory/pattern.ts` introduces
+  the `NoteEvent` IR every playing style resolves to; `playProgression` and
+  `exportMidiFile` both render through `renderBar`, so audible and exported material
+  can no longer diverge (export keeps its historical whole-bar chords via the
+  `sustain` pattern). `theory/melody.ts` holds the lane model — pitches relative to
+  the tonic, monophonic, variable-length notes on a 1/8 or 1/16 grid — and
+  `theory/generate.ts` is a rule-engine melody generator with one `surprise` knob that
+  unlocks liberties in stages against a per-phrase budget, hash-addressed per decision
+  so the slider morphs a melody instead of rerolling it. UI: `MelodyLane` (rows tinted
+  chord tone / scale tone / off-scale per bar, click to add, drag to move or lengthen,
+  click to delete) and `MelodySection` (resolution, generate, surprise, clear).
+
+Worth knowing for the next session: the melody plays through the same piano and the
+same MIDI channel as the chords — there is no separate lead voice or channel yet, and
+`.mid` export writes one format-0 track. Splitting them (format 1, channel 2) is the
+obvious next step if the lead needs its own instrument.
+
 Still unaddressed from the list above: vendored soundfont and self-hosted fonts,
 `chordName` key context, the 15k-song model, and the M0 hardware spikes.
 
@@ -154,7 +171,7 @@ Still unaddressed from the list above: vendored soundfont and self-hosted fonts,
 
 ```bash
 npm run dev                # dev server
-npx vitest run             # 157 tests
+npx vitest run             # 190 tests
 npx tsc --noEmit           # typecheck
 npm run build              # production build
 cd data && uv run pytest -q # 20 pipeline tests

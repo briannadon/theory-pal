@@ -13,7 +13,13 @@
 // clock at the same instant gives an offset used to convert every step's
 // `AudioContext`-relative time into the `performance.now()`-timebase
 // timestamp `MidiOut.sendChord` expects.
-import type { VoicedChord } from '../theory/index.ts';
+import {
+  DEFAULT_BAR_STYLE,
+  renderBar,
+  type BarStyle,
+  type NoteEvent,
+  type VoicedChord,
+} from '../theory/index.ts';
 import type { MidiOut } from '../midi/index.ts';
 import type { AudioEngine } from './engine.ts';
 import { StepScheduler, realTimeTicker, type Clock, type Ticker } from './scheduler.ts';
@@ -32,6 +38,16 @@ export interface PlayProgressionOptions {
   /** Live MIDI sink. Only used while `midi.available` — safe to always pass
    * a `MidiOut` even when access hasn't been granted. */
   midi?: MidiOut;
+  /** How each bar's chord is played: block chords (default) or an arpeggio.
+   * See theory/pattern.ts. */
+  style?: BarStyle;
+  /** Melody notes per bar-slot, already in beats-from-bar-start form. Indexed
+   * like `chords`; a missing or null entry is a bar with no melody. Scheduled
+   * alongside the chord from the same timeline, so the lead can never drift
+   * against the accompaniment. */
+  melody?: (NoteEvent[] | null)[];
+  /** Seeded RNG for styles that need one (`random` arpeggios). */
+  rng?: () => number;
   /** UI hook, e.g. to highlight the currently-playing grid cell. */
   onStep?: (index: number, timeSec: number) => void;
   /** Scheduler tuning — see scheduler.ts. Defaults: 25ms tick, 100ms lookahead. */
@@ -58,6 +74,7 @@ export function playProgression(opts: PlayProgressionOptions): Playback {
   const stepDurationSec = (60 / opts.bpm) * beatsPerBar;
   const velocity = opts.velocity ?? DEFAULT_VELOCITY;
   const wallNow = opts.now ?? (() => performance.now());
+  const style: BarStyle = { velocity, ...(opts.style ?? DEFAULT_BAR_STYLE) };
   const audio = opts.audio;
   const midi = opts.midi;
 
@@ -78,15 +95,27 @@ export function playProgression(opts: PlayProgressionOptions): Playback {
     stepDurationSec,
     (index, time) => {
       opts.onStep?.(index, time);
-      const chord = opts.chords[index];
-      if (!chord || chord.notes.length === 0) return;
       const beatDurationSec = 60 / opts.bpm;
-      const noteDurationSec = beatDurationSec * 0.85;
-      for (let b = 0; b < beatsPerBar; b++) {
-        const beatTime = time + b * beatDurationSec;
-        audio?.playAt(chord.notes, beatTime, noteDurationSec, velocity);
+
+      // Everything audible in this bar — the chord under the current playing
+      // style, plus any melody notes written for it — is one flat list of
+      // NoteEvents, so both sinks schedule from identical material and a new
+      // style never needs a second scheduling path.
+      const chord = opts.chords[index];
+      const events: NoteEvent[] = [];
+      if (chord && chord.notes.length > 0) {
+        events.push(...renderBar(chord, style, beatsPerBar, opts.rng));
+      }
+      const melodyBar = opts.melody?.[index];
+      if (melodyBar) events.push(...melodyBar);
+      if (events.length === 0) return;
+
+      for (const ev of events) {
+        const startSec = time + ev.startBeat * beatDurationSec;
+        const durationSec = ev.durationBeats * beatDurationSec;
+        audio?.playAt([ev.note], startSec, durationSec, ev.velocity);
         if (midi?.available && midiOffsetMs !== null) {
-          midi.sendChord(chord.notes, noteDurationSec * 1000, velocity, midiOffsetMs + beatTime * 1000);
+          midi.sendChord([ev.note], durationSec * 1000, ev.velocity, midiOffsetMs + startSec * 1000);
         }
       }
     },

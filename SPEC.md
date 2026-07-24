@@ -91,6 +91,36 @@ export function chordIntervals(quality: ChordQuality, mods?: ChordMods): number[
  * "does this still have a third?" from raw intervals. */
 export function chordShape(quality: ChordQuality, mods?: ChordMods): ChordShape;
 
+/** Bar rendering: the shared note-event IR. Playback and .mid export both go
+ * through `renderBar`, so anything audible is exportable and a new playing
+ * style is added in exactly one place. Beats, not seconds — the caller owns
+ * tempo; `startBeat` is relative to its own bar. */
+export interface NoteEvent { note: number; startBeat: number; durationBeats: number; velocity: number; }
+export type ArpPattern = 'sustain' | 'block' | 'up' | 'down' | 'updown' | 'downup' | 'random';
+export type ArpRate = '1/4' | '1/8' | '1/16' | '1/8t' | '1/16t';
+export interface BarStyle { pattern: ArpPattern; rate: ArpRate; octaves?: number; gate?: number; velocity?: number; }
+export function renderBar(c: VoicedChord, style: BarStyle, beatsPerBar: number, rng?: () => number): NoteEvent[];
+
+/** Melody lane. Pitches are semitones above the TONIC, like chord degrees, so
+ * a key change transposes the melody with the progression; time is in lane
+ * steps, and `melodyToBars` is the only place that converts to beats. */
+export interface MelodyNote { pitch: number; start: number; length: number; velocity?: number; }
+export interface MelodyLane { stepsPerBar: 8 | 16; notes: MelodyNote[]; }
+export function melodyToBars(lane: MelodyLane, key: Key, barCount: number, beatsPerBar?: number): (NoteEvent[] | null)[];
+export function melodyRowKind(pitch: number, chord: RelChord | null, key: Key): 'chord' | 'scale' | 'off';
+// plus lane editing helpers: addMelodyNote (monophonic — trims overlaps),
+// removeMelodyNote, setMelodyResolution, clampMelody, emptyMelody.
+
+/** Procedural melody generation: an explicit RULE ENGINE, not a trained model
+ * — the corpus is chords only. `surprise` (0-1) unlocks rule violations in
+ * stages, spending a per-phrase budget; `seed` makes it reproducible, and
+ * decisions are hash-addressed so moving the slider morphs the same melody
+ * rather than rerolling a new one. */
+export function generateMelody(opts: {
+  slots: readonly (RelChord | null)[]; key: Key; stepsPerBar: 8 | 16;
+  surprise?: number; seed?: number; lowPitch?: number; highPitch?: number;
+}): MelodyLane;
+
 /** Voicing: sequence of chords -> concrete MIDI notes, minimizing voice movement. */
 export interface VoicedChord { notes: number[]; }            // MIDI note numbers, sorted
 export function voiceProgression(
@@ -173,6 +203,11 @@ releasing only started voices would let the rest of the bar play out after Stop.
 Lookahead scheduler (25ms timer tick, 100ms schedule-ahead window) for playback; never
 `setTimeout` alone for note timing.
 
+`playProgression` additionally takes `style?: BarStyle` (how each bar's chord is played)
+and `melody?: (NoteEvent[] | null)[]` (lead notes per bar). Both resolve through
+`renderBar` into one flat event list per bar, so chords and melody are scheduled from a
+single timeline and cannot drift apart.
+
 ## `src/midi/`
 
 ```ts
@@ -192,7 +227,10 @@ export interface MidiOut {
   stopAll(): void;                       // MIDI panic: silence the selected output now
   readonly available: boolean;
 }
-export function exportMidiFile(bars: (AbsChord|null)[], bpm: number): Blob; // SMF format 0
+export function exportMidiFile(
+  bars: (AbsChord|null)[], bpm: number,
+  opts?: { style?: BarStyle; melody?: (NoteEvent[] | null)[] },   // defaults to whole-bar chords
+): Blob; // SMF format 0
 ```
 App must stay fully usable when MIDI access is denied.
 

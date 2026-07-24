@@ -72,6 +72,30 @@ function chord(notes: number[]): VoicedChord {
   return { notes };
 }
 
+// Bars are scheduled note by note (see theory/pattern.ts: every playing style
+// resolves to a flat NoteEvent list), so these helpers regroup the per-note
+// calls back into "what sounded at this instant" — the level the timing
+// assertions actually care about.
+interface PlayAtCall {
+  notes: number[];
+  whenSec: number;
+  durationSec: number;
+  velocity?: number;
+}
+
+function grouped(calls: unknown[]): PlayAtCall[] {
+  const out: PlayAtCall[] = [];
+  for (const raw of calls as PlayAtCall[]) {
+    const last = out[out.length - 1];
+    if (last && last.whenSec === raw.whenSec && last.durationSec === raw.durationSec) {
+      last.notes.push(...raw.notes);
+    } else {
+      out.push({ ...raw, notes: [...raw.notes] });
+    }
+  }
+  return out.map((c) => ({ ...c, notes: c.notes.slice().sort((a, b) => a - b) }));
+}
+
 describe('playProgression', () => {
   it('schedules each bar through the audio engine at the right time and duration', () => {
     const clock = fakeClock();
@@ -89,7 +113,7 @@ describe('playProgression', () => {
 
     playback.start();
     ticker.tick(); // first poll — start() only registers with the ticker, mirroring setInterval
-    expect(audio.playAtCalls).toEqual([
+    expect(grouped(audio.playAtCalls)).toEqual([
       { notes: [60, 64, 67], whenSec: 0, durationSec: 0.425, velocity: 100 },
       { notes: [60, 64, 67], whenSec: 0.5, durationSec: 0.425, velocity: 100 },
       { notes: [60, 64, 67], whenSec: 1, durationSec: 0.425, velocity: 100 },
@@ -98,7 +122,7 @@ describe('playProgression', () => {
 
     clock.set(1.95);
     ticker.tick();
-    expect(audio.playAtCalls).toEqual([
+    expect(grouped(audio.playAtCalls)).toEqual([
       { notes: [60, 64, 67], whenSec: 0, durationSec: 0.425, velocity: 100 },
       { notes: [60, 64, 67], whenSec: 0.5, durationSec: 0.425, velocity: 100 },
       { notes: [60, 64, 67], whenSec: 1, durationSec: 0.425, velocity: 100 },
@@ -113,6 +137,55 @@ describe('playProgression', () => {
     clock.set(4.0);
     ticker.tick();
     expect(playback.playing).toBe(false); // 2-bar, non-looping sequence is done
+  });
+
+  it('plays the chord under the requested style, and melody notes alongside it', () => {
+    const clock = fakeClock();
+    const ticker = manualTicker();
+    const audio = fakeAudioEngine();
+
+    const playback = playProgression({
+      chords: [chord([60, 64, 67])],
+      bpm: 120, // 0.5s/beat
+      style: { pattern: 'up', rate: '1/4' },
+      melody: [[{ note: 72, startBeat: 2, durationBeats: 1, velocity: 90 }]],
+      audio,
+      clock,
+      ticker,
+    });
+
+    playback.start();
+    ticker.tick();
+
+    expect(audio.playAtCalls).toEqual([
+      { notes: [60], whenSec: 0, durationSec: 0.425, velocity: 100 },
+      { notes: [64], whenSec: 0.5, durationSec: 0.425, velocity: 100 },
+      { notes: [67], whenSec: 1, durationSec: 0.425, velocity: 100 },
+      { notes: [60], whenSec: 1.5, durationSec: 0.425, velocity: 100 },
+      { notes: [72], whenSec: 1, durationSec: 0.5, velocity: 90 }, // melody, same timeline
+    ]);
+  });
+
+  it('plays a bar of melody even where the chord slot is empty', () => {
+    const clock = fakeClock();
+    const ticker = manualTicker();
+    const audio = fakeAudioEngine();
+
+    const playback = playProgression({
+      chords: [null],
+      bpm: 120,
+      melody: [[{ note: 72, startBeat: 0, durationBeats: 1, velocity: 80 }]],
+      audio,
+      clock,
+      ticker,
+    });
+
+    playback.start();
+    ticker.tick();
+
+    expect(audio.playAtCalls).toEqual([
+      { notes: [72], whenSec: 0, durationSec: 0.5, velocity: 80 },
+    ]);
   });
 
   it('skips null slots (silence) without calling the audio engine, but still fires onStep', () => {

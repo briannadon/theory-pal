@@ -14,7 +14,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { playProgression, type Playback } from '../../audio/index.ts';
 import { exportMidiFile } from '../../midi/index.ts';
 import { suggest, surprise, type Suggestion } from '../../model/index.ts';
-import { toAbsolute, voiceChord, type ChordQuality, type Key, type RelChord } from '../../theory/index.ts';
+import {
+  clampMelody,
+  emptyMelody,
+  melodyPitchToMidi,
+  melodyToBars,
+  toAbsolute,
+  voiceChord,
+  DEFAULT_BAR_STYLE,
+  type BarStyle,
+  type ChordQuality,
+  type Key,
+  type MelodyLane,
+  type RelChord,
+} from '../../theory/index.ts';
 import { useAudioEngine } from '../hooks/useAudioEngine.ts';
 import { useMidiOut } from '../hooks/useMidiOut.ts';
 import { useModel } from '../hooks/useModel.ts';
@@ -33,6 +46,7 @@ import { voiceGrid } from '../logic/voicing.ts';
 import { DiatonicStrip } from './DiatonicStrip.tsx';
 import { GridContainer } from './GridContainer.tsx';
 import { KeyPicker } from './KeyPicker.tsx';
+import { MelodySection } from './MelodySection.tsx';
 import { ModelBadge } from './ModelBadge.tsx';
 import { SoundOverlay } from './SoundOverlay.tsx';
 import { SuggestionStrip } from './SuggestionStrip.tsx';
@@ -48,6 +62,9 @@ export function TheoryPal() {
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const [surpriseRerollCount, setSurpriseRerollCount] = useState<number>(0);
   const [surpriseChord, setSurpriseChord] = useState<Suggestion | null>(null);
+  const [style, setStyle] = useState<BarStyle>(DEFAULT_BAR_STYLE);
+  const [melody, setMelody] = useState<MelodyLane>(() => emptyMelody(8));
+  const [melodySurprise, setMelodySurprise] = useState<number>(0.25);
 
   const playbackRef = useRef<Playback | null>(null);
 
@@ -71,6 +88,12 @@ export function TheoryPal() {
   useEffect(() => {
     setSurpriseChord(surprise(model, { context, key }));
   }, [model, context, key, surpriseRerollCount]);
+
+  // A shorter grid can leave melody notes stranded past its end, where they
+  // would keep sounding with nothing to play against.
+  useEffect(() => {
+    setMelody((m) => clampMelody(m, grid.size));
+  }, [grid.size]);
 
   // Keep piano toggle in sync with engine
   useEffect(() => {
@@ -108,6 +131,17 @@ export function TheoryPal() {
       if (midi.available) {
         midi.sendChord(voiced.notes, quarterNoteSec * 1000);
       }
+    },
+    [ensureInit, key, bpm, isPianoEnabled, engine, midi],
+  );
+
+  const handleAuditionPitch = useCallback(
+    (pitch: number) => {
+      void ensureInit();
+      const note = melodyPitchToMidi(pitch, key);
+      const quarterNoteSec = 60 / bpm;
+      if (isPianoEnabled) engine.playChord([note], quarterNoteSec);
+      if (midi.available) midi.sendChord([note], quarterNoteSec * 1000);
     },
     [ensureInit, key, bpm, isPianoEnabled, engine, midi],
   );
@@ -177,6 +211,8 @@ export function TheoryPal() {
       chords: voicedChords,
       bpm,
       loop: isLooping,
+      style,
+      melody: melodyToBars(melody, key, activeSlots.length),
       audio: engine,
       midi: midi.available ? midi : undefined,
       onStep: (index) => setPlayingIndex(index),
@@ -185,7 +221,7 @@ export function TheoryPal() {
     playbackRef.current = playback;
     playback.start();
     setIsPlaying(true);
-  }, [isPlaying, grid.slots, ensureInit, engine, isPianoEnabled, key, bpm, isLooping, midi]);
+  }, [isPlaying, grid.slots, ensureInit, engine, isPianoEnabled, key, bpm, isLooping, midi, style, melody]);
 
   const handleExportMidi = useCallback(() => {
     let lastFilled = -1;
@@ -199,14 +235,17 @@ export function TheoryPal() {
 
     const activeSlots = grid.slots.slice(0, lastFilled + 1);
     const absBars = activeSlots.map((s) => (s !== null ? toAbsolute(s, key) : null));
-    const blob = exportMidiFile(absBars, bpm);
+    const blob = exportMidiFile(absBars, bpm, {
+      style,
+      melody: melodyToBars(melody, key, activeSlots.length),
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `progression-${key.tonic}-${key.scale}.mid`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [grid.slots, key, bpm]);
+  }, [grid.slots, key, bpm, style, melody]);
 
   // Picking a quality by hand replaces the chord outright, dropping any
   // modifiers it arrived with: the dropdown lists base qualities, so keeping
@@ -250,6 +289,16 @@ export function TheoryPal() {
             onClearSlot={(idx: number) => setGrid((g) => clearSlot(g, idx))}
             onModifyQualitySlot={handleModifyQualitySlot}
           />
+          <MelodySection
+            lane={melody}
+            keyValue={key}
+            slots={grid.slots}
+            playingBar={playingIndex}
+            surprise={melodySurprise}
+            onSurpriseChange={setMelodySurprise}
+            onChange={setMelody}
+            onAuditionPitch={handleAuditionPitch}
+          />
         </main>
 
         <Transport
@@ -261,6 +310,8 @@ export function TheoryPal() {
           onToggleLoop={() => setIsLooping((l) => !l)}
           isPianoEnabled={isPianoEnabled}
           onTogglePiano={() => setIsPianoEnabled((p) => !p)}
+          style={style}
+          onStyleChange={setStyle}
           midiStatus={midiStatus}
           midiPorts={midiPorts}
           selectedMidiPortId={selectedPortId}

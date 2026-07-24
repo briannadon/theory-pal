@@ -170,11 +170,24 @@ end-to-end before running the full corpus.
   annotations served the same purpose.
 - M3. **DONE**. Key picker, diatonic and suggestion strips, chord cells, hooks, grid container, transport, MIDI port picker, and top-level `TheoryPal` layout in `src/App.tsx`.
 - M4. **DONE**. Progression grid container, drag-and-drop slot reordering, playback lookahead scheduler, Web MIDI out, and `.mid` export fully implemented and verified. Deploy pipeline is green: Pages is enabled, GitHub Actions builds and publishes on push.
-- M5 (post-MVP, in priority order). **PARTLY DONE**: the in-key strip's family
-  selector became stackable sus2/sus4/7/9 modifiers, carried through naming, roman
-  numerals, voicing, audition, and export. Remaining: 11ths/13ths (same `ChordMods`
-  mechanism); suggestion blend tuning; strum/arp patterns and melody/lead support;
-  progression save/share (URL-encoded state is enough, still no backend).
+- M5 (post-MVP). **MOSTLY DONE**:
+  - Extended chords: the in-key strip's family selector became stackable
+    sus2/sus4/7/9 modifiers, carried through naming, roman numerals, voicing,
+    audition, and export.
+  - Arp patterns: a shared `NoteEvent` IR (`theory/pattern.ts`) replaced the hardcoded
+    "chord on every beat" in playback and the separately-derived timings in `.mid`
+    export, and arpeggios ride on top of it — up/down/up-down/down-up/random at
+    1/4-1/16 including triplets.
+  - Melody/lead: a piano-roll lane (`theory/melody.ts` + `ui/MelodyLane`), rows tinted
+    by chord tone / scale tone / off-scale against the bar's own chord, plus a
+    procedural generator (`theory/generate.ts`) with one surprise slider. The
+    generator is a *rule engine*, not a model: Chordonomicon carries no melodic data,
+    and the UI says so.
+
+  Remaining: 11ths/13ths (same `ChordMods` mechanism); suggestion blend tuning;
+  per-slot arp overrides; progression save/share (URL-encoded state is enough, still
+  no backend). A corpus-trained melody model would need a second data pipeline
+  (Essen or Lakh MIDI); only worth it if the rule engine proves too dull.
 
 ## Prior art (and why not just use it)
 
@@ -201,7 +214,12 @@ with probabilities, live MIDI out on Linux, open data pipeline.
 - Non-diatonic suggestions are core, not optional.
 - Suggestion display: ranked list with percentages, plus a "surprise me" slot.
 - Two-strip layout (diatonic on top, suggestions below), Scaler-like simplicity.
-- Voice leading in v1; strum/arp is a stretch goal.
+- Voice leading in v1; strum/arp is a stretch goal (shipped 2026-07-24).
+- (2026-07-24) Melody support: hand-editable piano-roll lane with chord-aware row
+  tinting, fed by a procedural rule engine rather than a trained model, tuned by a
+  single "surprise" slider that stages rule violations rather than exposing one
+  toggle per rule. Lane pitches are stored relative to the tonic, notes are
+  variable-length and monophonic, and the lane grid is 1/8 or 1/16.
 - (2026-07-24) In-key chords are built by stacking modifiers — sus2/sus4 mutually
   exclusive, 7 and 9 independent — rather than picking one prebuilt family. Modifiers
   live on the strip only; a chord is frozen as-is when dropped into the grid.

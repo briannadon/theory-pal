@@ -23,3 +23,23 @@ export { romanNumeral } from './roman.ts';
 
 export type { VoicedChord, VoiceOpts } from './voicing.ts';
 export { voiceChord, voiceProgression } from './voicing.ts';
+
+export type { NoteEvent, ArpPattern, ArpRate, BarStyle } from './pattern.ts';
+export { renderBar, DEFAULT_BAR_STYLE } from './pattern.ts';
+
+export type { GenerateMelodyOptions } from './generate.ts';
+export { generateMelody } from './generate.ts';
+
+export type { MelodyNote, MelodyLane } from './melody.ts';
+export {
+  MELODY_BASE_MIDI,
+  MELODY_ROWS,
+  emptyMelody,
+  melodyPitchToMidi,
+  melodyRowKind,
+  melodyToBars,
+  setMelodyResolution,
+  addMelodyNote,
+  removeMelodyNote,
+  clampMelody,
+} from './melody.ts';
