@@ -494,6 +494,9 @@
 
 .grid-slot {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   touch-action: none;
 }
 
@@ -543,22 +546,21 @@
 }
 
 .grid-slot__quality-select {
-  position: absolute;
-  bottom: 5px;
-  left: 6px;
-  right: 6px;
-  width: calc(100% - 12px);
   box-sizing: border-box;
+  width: 100%;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.2;
   color: var(--ink-dim);
-  background: var(--bg-1);
+  background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 2px 4px;
+  padding: 4px 6px;
   cursor: pointer;
-  z-index: 2;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .grid-slot__quality-select:hover {
@@ -569,7 +571,7 @@
 
 .grid-slot__index {
   position: absolute;
-  top: 4px;
+  bottom: 4px;
   left: 7px;
   font-family: var(--font-mono);
   font-size: 9px;
