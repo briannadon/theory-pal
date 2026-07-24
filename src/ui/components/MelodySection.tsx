@@ -20,6 +20,8 @@ export interface MelodySectionProps {
   keyValue: Key;
   slots: readonly (RelChord | null)[];
   playingBar: number | null;
+  hoveredBar: number | null;
+  onHoverBar: (bar: number | null) => void;
   surprise: number;
   onSurpriseChange: (value: number) => void;
   onChange: (lane: MelodyLaneData) => void;
@@ -36,6 +38,8 @@ export function MelodySection({
   keyValue,
   slots,
   playingBar,
+  hoveredBar,
+  onHoverBar,
   surprise,
   onSurpriseChange,
   onChange,
@@ -103,7 +107,8 @@ export function MelodySection({
         </button>
 
         <span className="tp-strip__hint" style={{ marginLeft: 'auto' }}>
-          click to add · drag to move · drag the right edge to lengthen · click a note to delete
+          click to add · drag to move · drag the right edge to lengthen · click a note to delete ·
+          hover a bar to see its chord tones
         </span>
       </div>
 
@@ -112,6 +117,8 @@ export function MelodySection({
         keyValue={keyValue}
         slots={slots}
         playingBar={playingBar}
+        hoveredBar={hoveredBar}
+        onHoverBar={onHoverBar}
         onChange={onChange}
         onAuditionPitch={onAuditionPitch}
       />

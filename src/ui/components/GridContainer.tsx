@@ -24,6 +24,7 @@ export interface GridContainerProps {
   onAuditionSlot: (chord: RelChord) => void;
   onClearSlot: (index: number) => void;
   onModifyQualitySlot?: (index: number, quality: ChordQuality) => void;
+  onHoverSlot?: (index: number | null) => void;
 }
 
 const SIZES: GridSize[] = [4, 8, 16];
@@ -37,6 +38,7 @@ export function GridContainer({
   onAuditionSlot,
   onClearSlot,
   onModifyQualitySlot,
+  onHoverSlot,
 }: GridContainerProps) {
   const slotIds = state.slots.map((_, i) => slotId(i));
   const hasChords = state.slots.some((s) => s !== null);
@@ -98,6 +100,7 @@ export function GridContainer({
                 }}
                 onClear={() => onClearSlot(i)}
                 onModifyQuality={(q) => onModifyQualitySlot?.(i, q)}
+                onHoverChange={(hovering) => onHoverSlot?.(hovering ? i : null)}
               />
             );
           })}

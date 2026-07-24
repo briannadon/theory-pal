@@ -65,6 +65,7 @@ export function TheoryPal() {
   const [style, setStyle] = useState<BarStyle>(DEFAULT_BAR_STYLE);
   const [melody, setMelody] = useState<MelodyLane>(() => emptyMelody(8));
   const [melodySurprise, setMelodySurprise] = useState<number>(0.25);
+  const [hoveredBar, setHoveredBar] = useState<number | null>(null);
 
   const playbackRef = useRef<Playback | null>(null);
 
@@ -288,12 +289,15 @@ export function TheoryPal() {
             onAuditionSlot={handleAudition}
             onClearSlot={(idx: number) => setGrid((g) => clearSlot(g, idx))}
             onModifyQualitySlot={handleModifyQualitySlot}
+            onHoverSlot={setHoveredBar}
           />
           <MelodySection
             lane={melody}
             keyValue={key}
             slots={grid.slots}
             playingBar={playingIndex}
+            hoveredBar={hoveredBar}
+            onHoverBar={setHoveredBar}
             surprise={melodySurprise}
             onSurpriseChange={setMelodySurprise}
             onChange={setMelody}

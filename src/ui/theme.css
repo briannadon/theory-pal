@@ -515,6 +515,54 @@
 /* Melody lane                                                            */
 /* ---------------------------------------------------------------------- */
 
+.tp-lane {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+
+/* Note-name gutter. Stays put while the lane scrolls horizontally, and its
+   keys are clickable so a row can be heard before a note is written to it. */
+.tp-lane__gutter {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  border: 1px solid var(--line);
+  border-right: none;
+  border-radius: var(--radius) 0 0 var(--radius);
+  background: var(--bg-1);
+  overflow: hidden;
+}
+
+.tp-lane__key {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 46px;
+  padding-right: 6px;
+  box-sizing: border-box;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1;
+  color: var(--ink-faint);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.35);
+  transition:
+    color 0.1s ease,
+    background 0.1s ease;
+}
+
+.tp-lane__key:hover {
+  color: var(--ink);
+  background: var(--bg-3);
+}
+
+.tp-lane__key--tonic {
+  color: var(--ink-dim);
+  border-bottom-color: var(--line);
+}
+
 .tp-lane__scroll {
   overflow-x: auto;
   padding-bottom: 4px;
@@ -524,7 +572,7 @@
 .tp-lane__surface {
   position: relative;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: 0 var(--radius) var(--radius) 0;
   background: var(--bg-1);
   overflow: hidden;
   cursor: crosshair;
@@ -545,6 +593,27 @@
   box-shadow: inset 0 0 0 9999px rgba(255, 255, 255, 0.02);
 }
 
+/* Hovering a bar resolves the whole lane to that one chord: its tones lift,
+   everything else recedes. Applied as an overlay so the per-bar tinting
+   underneath stays visible rather than being replaced. */
+.tp-lane__row--lit {
+  box-shadow: inset 0 0 0 9999px rgba(82, 230, 193, 0.16);
+}
+
+.tp-lane__row--dim {
+  box-shadow: inset 0 0 0 9999px rgba(10, 11, 15, 0.55);
+}
+
+.tp-lane__key--lit {
+  color: var(--accent-diatonic);
+  background: rgba(82, 230, 193, 0.1);
+}
+
+.tp-lane__key--dim {
+  color: var(--ink-faint);
+  opacity: 0.5;
+}
+
 .tp-lane__barline {
   position: absolute;
   top: 0;
@@ -555,6 +624,11 @@
 
 .tp-lane__barline--playing {
   background: rgba(148, 151, 255, 0.08);
+}
+
+.tp-lane__barline--hovered {
+  border-left-color: var(--accent-diatonic);
+  box-shadow: inset -1px 0 0 var(--accent-diatonic);
 }
 
 .tp-lane__note {

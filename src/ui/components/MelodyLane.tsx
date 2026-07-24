@@ -4,6 +4,11 @@
 // the lane: it teaches where the safe notes are while you write, and it moves
 // as the harmony moves.
 //
+// Hovering a bar (here, or its tile in the grid above) resolves the lane to
+// that one chord: its tones light up across the full width and everything else
+// recedes, answering "what can I play over this chord?" in one glance instead
+// of asking the eye to scan a single column.
+//
 // Rendering: rows are absolutely-positioned bands whose background is a single
 // left-to-right gradient with one stop per bar, rather than one element per
 // cell. A 16-bar 1/16 lane is 256 columns; per-cell elements would be 6400
@@ -12,6 +17,7 @@
 import { useCallback, useRef, useState } from 'react';
 import {
   addMelodyNote,
+  melodyPitchToMidi,
   melodyRowKind,
   MELODY_ROWS,
   noteName,
@@ -27,6 +33,10 @@ export interface MelodyLaneProps {
   /** Chord per bar-slot, so each column knows what it is played against. */
   slots: readonly (RelChord | null)[];
   playingBar: number | null;
+  /** Bar whose chord the lane is currently resolving to, from either this
+   * component's own bar hover or a chord tile in the grid above. */
+  hoveredBar: number | null;
+  onHoverBar: (bar: number | null) => void;
   onChange: (lane: MelodyLaneData) => void;
   onAuditionPitch: (pitch: number) => void;
 }
@@ -42,6 +52,8 @@ export function MelodyLane({
   keyValue,
   slots,
   playingBar,
+  hoveredBar,
+  onHoverBar,
   onChange,
   onAuditionPitch,
 }: MelodyLaneProps) {
@@ -56,6 +68,14 @@ export function MelodyLane({
 
   // Rows run high pitch at the top, so row 0 is the top of the lane.
   const pitchForRow = (row: number) => MELODY_ROWS - 1 - row;
+
+  const hoveredChord = hoveredBar !== null ? (slots[hoveredBar] ?? null) : null;
+  const rowFocus = (pitch: number): '' | ' tp-lane__row--lit' | ' tp-lane__row--dim' => {
+    if (hoveredBar === null) return '';
+    return melodyRowKind(pitch, hoveredChord, keyValue) === 'chord'
+      ? ' tp-lane__row--lit'
+      : ' tp-lane__row--dim';
+  };
 
   const pointToCell = useCallback(
     (clientX: number, clientY: number) => {
@@ -89,8 +109,12 @@ export function MelodyLane({
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!drag) return;
     const cell = pointToCell(e.clientX, e.clientY);
+
+    if (!drag) {
+      onHoverBar(cell ? Math.floor(cell.step / lane.stepsPerBar) : null);
+      return;
+    }
     if (!cell) return;
     const current = lane.notes[drag.index];
     if (!current) return;
@@ -139,49 +163,77 @@ export function MelodyLane({
     return `linear-gradient(to right, ${stops.join(', ')})`;
   };
 
+  const rowLabel = (pitch: number): string => {
+    const midi = melodyPitchToMidi(pitch, keyValue);
+    return `${noteName(midi % 12, 'maj')}${Math.floor(midi / 12) - 1}`;
+  };
+
   return (
-    <div className="tp-lane__scroll">
-      <div
-        className="tp-lane__surface"
-        ref={surfaceRef}
-        style={{ width, height }}
-        onPointerDown={handleSurfacePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-      >
+    <div className="tp-lane" onPointerLeave={() => onHoverBar(null)}>
+      <div className="tp-lane__gutter" style={{ height }}>
         {Array.from({ length: MELODY_ROWS }, (_, row) => {
           const pitch = pitchForRow(row);
           return (
-            <div
+            <button
               key={row}
-              className={`tp-lane__row${pitch % 12 === 0 ? ' tp-lane__row--tonic' : ''}`}
-              style={{ top: row * ROW_H, height: ROW_H, background: rowGradient(pitch) }}
-            />
+              type="button"
+              className={`tp-lane__key${pitch % 12 === 0 ? ' tp-lane__key--tonic' : ''}${rowFocus(pitch)}`}
+              style={{ height: ROW_H }}
+              onClick={() => onAuditionPitch(pitch)}
+              tabIndex={-1}
+              aria-label={`Hear ${rowLabel(pitch)}`}
+            >
+              {rowLabel(pitch)}
+            </button>
           );
         })}
+      </div>
 
-        {slots.map((_, bar) => (
-          <div
-            key={`bar-${bar}`}
-            className={`tp-lane__barline${playingBar === bar ? ' tp-lane__barline--playing' : ''}`}
-            style={{ left: bar * lane.stepsPerBar * stepW, width: lane.stepsPerBar * stepW }}
-          />
-        ))}
+      <div className="tp-lane__scroll">
+        <div
+          className="tp-lane__surface"
+          ref={surfaceRef}
+          style={{ width, height }}
+          onPointerDown={handleSurfacePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+        >
+          {Array.from({ length: MELODY_ROWS }, (_, row) => {
+            const pitch = pitchForRow(row);
+            return (
+              <div
+                key={row}
+                className={`tp-lane__row${pitch % 12 === 0 ? ' tp-lane__row--tonic' : ''}${rowFocus(pitch)}`}
+                style={{ top: row * ROW_H, height: ROW_H, background: rowGradient(pitch) }}
+              />
+            );
+          })}
 
-        {lane.notes.map((note, i) => (
-          <div
-            key={`${note.start}-${note.pitch}-${i}`}
-            className={`tp-lane__note${drag?.index === i ? ' tp-lane__note--active' : ''}`}
-            style={{
-              left: note.start * stepW,
-              width: Math.max(1, note.length) * stepW - 1,
-              top: (MELODY_ROWS - 1 - note.pitch) * ROW_H,
-              height: ROW_H - 1,
-            }}
-            onPointerDown={(e) => handleNotePointerDown(e, i, note)}
-            title={`${noteName((keyValue.tonic + note.pitch) % 12, 'maj')} · drag to move, drag the right edge to lengthen, click to delete`}
-          />
-        ))}
+          {slots.map((_, bar) => (
+            <div
+              key={`bar-${bar}`}
+              className={`tp-lane__barline${playingBar === bar ? ' tp-lane__barline--playing' : ''}${
+                hoveredBar === bar ? ' tp-lane__barline--hovered' : ''
+              }`}
+              style={{ left: bar * lane.stepsPerBar * stepW, width: lane.stepsPerBar * stepW }}
+            />
+          ))}
+
+          {lane.notes.map((note, i) => (
+            <div
+              key={`${note.start}-${note.pitch}-${i}`}
+              className={`tp-lane__note${drag?.index === i ? ' tp-lane__note--active' : ''}`}
+              style={{
+                left: note.start * stepW,
+                width: Math.max(1, note.length) * stepW - 1,
+                top: (MELODY_ROWS - 1 - note.pitch) * ROW_H,
+                height: ROW_H - 1,
+              }}
+              onPointerDown={(e) => handleNotePointerDown(e, i, note)}
+              title={`${rowLabel(note.pitch)} · drag to move, drag the right edge to lengthen, click to delete`}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

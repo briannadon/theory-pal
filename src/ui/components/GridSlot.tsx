@@ -14,6 +14,10 @@ export interface GridSlotProps {
   onAudition: () => void;
   onClear: () => void;
   onModifyQuality?: (quality: ChordQuality) => void;
+  /** Hovering a chord tile resolves the melody lane to that chord — see
+   * MelodyLane. Reported here rather than derived there so both the tile and
+   * the lane's own bar segment drive the same highlight. */
+  onHoverChange?: (hovering: boolean) => void;
 }
 
 export function GridSlot({
@@ -27,6 +31,7 @@ export function GridSlot({
   onAudition,
   onClear,
   onModifyQuality,
+  onHoverChange,
 }: GridSlotProps) {
   // Slot ids/keys are positional (`slot-0`…`slot-n`), so a reorder moves the
   // chord *content* between DOM nodes that themselves never move. dnd-kit's
@@ -47,6 +52,8 @@ export function GridSlot({
       ref={setNodeRef}
       style={style}
       className={`grid-slot${isDragging ? ' grid-slot--dragging' : ''}${isPlaying ? ' grid-slot--playing' : ''}`}
+      onPointerEnter={() => onHoverChange?.(true)}
+      onPointerLeave={() => onHoverChange?.(false)}
     >
       <button
         type="button"
