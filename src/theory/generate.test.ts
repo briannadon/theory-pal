@@ -32,7 +32,7 @@ function kinds(surpriseLevel: number, seed = 7) {
 describe('generateMelody', () => {
   it('writes notes across every bar of the progression', () => {
     const lane = generate(0);
-    expect(lane.notes.length).toBeGreaterThanOrEqual(2 * slots.length); // sparsest cell is 2/bar
+    expect(lane.notes.length).toBeGreaterThanOrEqual(slots.length); // sparsest cell is one whole-bar note
     const bars = new Set(lane.notes.map((n) => Math.floor(n.start / lane.stepsPerBar)));
     expect(bars).toEqual(new Set([0, 1, 2, 3]));
   });
@@ -114,6 +114,68 @@ describe('generateMelody', () => {
     const lane = generate(0.4, 7, 16);
     expect(lane.stepsPerBar).toBe(16);
     expect(Math.max(...lane.notes.map((n) => n.start))).toBeLessThan(4 * 16);
+  });
+
+  it('keeps the line inside a singable span, never the lane’s full two octaves', () => {
+    // Essen melodies average 13.6 semitones lowest-to-highest (Temperley 2006);
+    // MAX_SPAN caps generated lines near that.
+    for (const surpriseLevel of [0, 0.4, 0.8, 1]) {
+      for (let seed = 1; seed <= 40; seed++) {
+        const pitches = generateMelody({
+          slots,
+          key: cMajor,
+          stepsPerBar: 8,
+          surprise: surpriseLevel,
+          seed,
+        }).notes.map((n) => n.pitch);
+        expect(Math.max(...pitches) - Math.min(...pitches)).toBeLessThanOrEqual(14);
+      }
+    }
+  });
+
+  it('moves mostly by step, as folk melodies do', () => {
+    let steps = 0;
+    let intervals = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const notes = generate(0, seed).notes;
+      for (let i = 1; i < notes.length; i++) {
+        intervals++;
+        if (Math.abs(notes[i].pitch - notes[i - 1].pitch) <= 2) steps++;
+      }
+    }
+    expect(steps / intervals).toBeGreaterThan(0.5);
+  });
+
+  it('never writes an awkward leap at surprise 0', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const notes = generate(0, seed).notes;
+      for (let i = 1; i < notes.length; i++) {
+        const size = Math.abs(notes[i].pitch - notes[i - 1].pitch);
+        expect([6, 10, 11]).not.toContain(size); // tritone, minor/major 7th
+      }
+    }
+  });
+
+  it('stays sparse by default and only gets busy when surprise is turned up', () => {
+    const noteCount = (s: number) => {
+      let total = 0;
+      for (let seed = 1; seed <= 40; seed++) total += generate(s, seed).notes.length;
+      return total / 40;
+    };
+    const calm = noteCount(0);
+    expect(calm).toBeLessThanOrEqual(3.5 * slots.length); // averages under ~3.5 notes/bar
+    expect(noteCount(1)).toBeGreaterThan(calm);
+  });
+
+  it('leaves rests: notes do not always run into the next onset', () => {
+    let gaps = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const notes = generate(0, seed).notes;
+      for (let i = 1; i < notes.length; i++) {
+        if (notes[i - 1].start + notes[i - 1].length < notes[i].start) gaps++;
+      }
+    }
+    expect(gaps).toBeGreaterThan(0);
   });
 
   it('handles an empty or chordless grid without throwing', () => {

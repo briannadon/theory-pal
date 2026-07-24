@@ -111,11 +111,15 @@ export function melodyRowKind(pitch: number, chord: RelChord | null, key: Key): 
 // plus lane editing helpers: addMelodyNote (monophonic — trims overlaps),
 // removeMelodyNote, setMelodyResolution, clampMelody, emptyMelody.
 
-/** Procedural melody generation: an explicit RULE ENGINE, not a trained model
- * — the corpus is chords only. `surprise` (0-1) unlocks rule violations in
- * stages, spending a per-phrase budget; `seed` makes it reproducible, and
- * decisions are hash-addressed so moving the slider morphs the same melody
- * rather than rerolling a new one. */
+/** Procedural melody generation. Not a trained model — the corpus is chords
+ * only — but not invented either: pitch scoring ports Temperley's RPK model
+ * (Range x Proximity x Key profiles, fit to the Essen Folksong Collection) into
+ * log space, so each factor is one penalty term. Harmony and rhythm sit on top,
+ * since RPK models neither. Lines are capped near Essen's average 13.6-semitone
+ * span. `surprise` (0-1) unlocks rule violations in stages, spending a
+ * per-phrase budget; `seed` makes it reproducible, and decisions are
+ * hash-addressed so moving the slider morphs the same melody rather than
+ * rerolling a new one. */
 export function generateMelody(opts: {
   slots: readonly (RelChord | null)[]; key: Key; stepsPerBar: 8 | 16;
   surprise?: number; seed?: number; lowPitch?: number; highPitch?: number;

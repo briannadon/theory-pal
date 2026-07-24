@@ -13,7 +13,7 @@ A browser-based chord progression assistant: select a key and scale, get corpus-
 - **Progression grid & direct chord editing**: Drag chords into a 4/8/16-slot grid, modify individual chord qualities directly via inline selectors, reorder slots, and hear the result.
 - **Arpeggiator**: Play each bar as block chords or an arpeggio (up, down, up-down, down-up, random) at 1/4 through 1/16, including triplets.
 - **Melody lane**: A piano-roll editor under the grid, with rows tinted by what each pitch means against the chord in that bar (chord tone, other scale tone, off-scale). Click to add, drag to move, drag a note's right edge to lengthen, click it to delete.
-- **Procedural melody generation**: Generate a melody over the progression from an explicit rule engine (chord tones on strong beats, resolving passing tones, rhythm cells reused across bars), with a single "surprise" slider that unlocks liberties in stages. Not corpus-trained: the Chordonomicon data is chords only.
+- **Procedural melody generation**: Generate a singable melody over the progression, with a single "surprise" slider that unlocks liberties in stages. Pitch choice ports Temperley's RPK model of melody perception (range, pitch proximity, and corpus key profiles, fit to the Essen Folksong Collection); harmony and rhythm rules sit on top. Not corpus-trained: the Chordonomicon data is chords only.
 - **MIDI export**: Save progressions as `.mid` files, including arpeggios and the melody line.
 
 ## Running Locally
