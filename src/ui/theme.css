@@ -481,10 +481,13 @@
   color: var(--ink);
 }
 
+/* Fixed 104px columns (not minmax(…, 1fr)) so grid slots share the exact
+   pitch of the 104px strip cells above and line up column-for-column. */
 .tp-grid__cells {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  grid-template-columns: repeat(auto-fill, 104px);
   gap: 8px;
+  justify-content: start;
 }
 
 .grid-slot {
