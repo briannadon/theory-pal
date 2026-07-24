@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Key, RelChord } from '../../theory/index.ts';
 import { modifierState, toggleModifier } from '../logic/chordMods.ts';
 import { ChordFace, type ChordAccent } from './ChordFace.tsx';
@@ -41,6 +41,26 @@ export function GridSlot({
 }: GridSlotProps) {
   const [modsOpen, setModsOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [shift, setShift] = useState(0);
+
+  // The panel is centered on its button, which pushes it off-screen for slots
+  // near either edge of the grid — the leftmost tile clipped its first toggle.
+  // Measure once on open and slide it back inside the viewport.
+  useLayoutEffect(() => {
+    if (!modsOpen) {
+      setShift(0);
+      return;
+    }
+    const el = panelRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const margin = 8;
+    if (rect.left < margin) setShift(margin - rect.left);
+    else if (rect.right > window.innerWidth - margin) {
+      setShift(window.innerWidth - margin - rect.right);
+    }
+  }, [modsOpen]);
 
   // Click anywhere else — including another slot's button — closes this one.
   // Pointerdown rather than click so the popover is gone before whatever was
@@ -122,7 +142,12 @@ export function GridSlot({
             mods
           </button>
           {modsOpen && (
-            <div className="grid-slot__popover" onPointerDown={(e) => e.stopPropagation()}>
+            <div
+              className="grid-slot__popover"
+              ref={panelRef}
+              style={{ transform: `translateX(calc(-50% + ${shift}px))` }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
               <ModifierBar
                 value={modifierState(chord)}
                 onToggle={(modifier: ChordModifier) =>
