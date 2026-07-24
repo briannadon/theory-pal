@@ -147,10 +147,20 @@ Lookahead scheduler (25ms timer tick, 100ms schedule-ahead window) for playback;
 ## `src/midi/`
 
 ```ts
+export interface MidiPort {
+  id: string;
+  name: string;
+  manufacturer?: string;
+}
 export interface MidiOut {
   requestAccess(): Promise<MidiPort[]>;  // called on user action ONLY, never on page load
   selectPort(id: string): void;
-  sendChord(notes: number[], durationMs: number, velocity?: number): void;
+  // whenMs is optional: a performance.now()-timebase timestamp, forwarded to
+  // Web MIDI's own timestamped send() so a shared audio+MIDI scheduler (see
+  // `src/audio/playback.ts`) can schedule both sinks precisely from one
+  // timeline. Omitted, notes send as soon as possible.
+  sendChord(notes: number[], durationMs: number, velocity?: number, whenMs?: number): void;
+  stopAll(): void;                       // MIDI panic: silence the selected output now
   readonly available: boolean;
 }
 export function exportMidiFile(bars: (AbsChord|null)[], bpm: number): Blob; // SMF format 0
