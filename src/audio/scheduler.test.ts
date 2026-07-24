@@ -181,7 +181,7 @@ describe('StepScheduler', () => {
     expect(scheduler.running).toBe(true);
 
     clock.set(2);
-    capturedTick?.();
+    (capturedTick as null | (() => void))?.();
     expect(scheduler.running).toBe(false);
     expect(stopCalls).toBe(1); // the synchronous in-tick stop(), not a second one from start()
     expect(capturedTick).not.toBeNull();
