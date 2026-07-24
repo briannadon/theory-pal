@@ -158,12 +158,20 @@ export function TheoryPal() {
       return;
     }
 
-    if (!grid.slots.some((s) => s !== null)) return;
+    let lastFilled = -1;
+    for (let i = grid.slots.length - 1; i >= 0; i--) {
+      if (grid.slots[i] !== null) {
+        lastFilled = i;
+        break;
+      }
+    }
+    if (lastFilled < 0) return;
 
     await ensureInit();
     engine.setEnabled(isPianoEnabled);
 
-    const voicedChords = voiceGrid(grid.slots, key);
+    const activeSlots = grid.slots.slice(0, lastFilled + 1);
+    const voicedChords = voiceGrid(activeSlots, key);
     const playback = playProgression({
       chords: voicedChords,
       bpm,
@@ -179,7 +187,17 @@ export function TheoryPal() {
   }, [isPlaying, grid.slots, ensureInit, engine, isPianoEnabled, key, bpm, isLooping, midi]);
 
   const handleExportMidi = useCallback(() => {
-    const absBars = grid.slots.map((s) => (s !== null ? toAbsolute(s, key) : null));
+    let lastFilled = -1;
+    for (let i = grid.slots.length - 1; i >= 0; i--) {
+      if (grid.slots[i] !== null) {
+        lastFilled = i;
+        break;
+      }
+    }
+    if (lastFilled < 0) return;
+
+    const activeSlots = grid.slots.slice(0, lastFilled + 1);
+    const absBars = activeSlots.map((s) => (s !== null ? toAbsolute(s, key) : null));
     const blob = exportMidiFile(absBars, bpm);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
