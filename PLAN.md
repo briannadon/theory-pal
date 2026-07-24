@@ -182,7 +182,11 @@ end-to-end before running the full corpus.
     by chord tone / scale tone / off-scale against the bar's own chord, plus a
     procedural generator (`theory/generate.ts`) with one surprise slider. The
     generator is a *rule engine*, not a model: Chordonomicon carries no melodic data,
-    and the UI says so.
+    and the UI says so. Its pitch scoring ports Temperley's RPK model (range x
+    proximity x key profile, fit to the Essen Folksong Collection), with the harmony
+    and rhythm rules RPK doesn't cover layered over it; melodies are capped near
+    Essen's average 13.6-semitone span so they stay singable. Citations are in the
+    header comment of generate.ts.
 
   Remaining: 11ths/13ths (same `ChordMods` mechanism); suggestion blend tuning;
   per-slot arp overrides; progression save/share (URL-encoded state is enough, still

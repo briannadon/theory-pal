@@ -11,7 +11,7 @@ see "Where the UI left off").
 ## Where things stand
 
 M0 through M3 are done except for the spikes that need the user's hardware and the UI
-wiring. 190 tests pass, `npx tsc --noEmit` is clean, and the deploy pipeline is green
+wiring. 195 tests pass, `npx tsc --noEmit` is clean, and the deploy pipeline is green
 end to end.
 
 | Milestone | State |
@@ -153,9 +153,12 @@ Four changes, all committed and pushed to `master`:
   can no longer diverge (export keeps its historical whole-bar chords via the
   `sustain` pattern). `theory/melody.ts` holds the lane model — pitches relative to
   the tonic, monophonic, variable-length notes on a 1/8 or 1/16 grid — and
-  `theory/generate.ts` is a rule-engine melody generator with one `surprise` knob that
-  unlocks liberties in stages against a per-phrase budget, hash-addressed per decision
-  so the slider morphs a melody instead of rerolling it. UI: `MelodyLane` (rows tinted
+  `theory/generate.ts` is a melody generator whose pitch scoring ports Temperley's RPK
+  model (range x proximity x Essen key profiles) into log space, with harmony and
+  rhythm rules on top and one `surprise` knob unlocking liberties in stages against a
+  per-phrase budget, hash-addressed per decision so the slider morphs a melody instead
+  of rerolling it. Output is deliberately sparse and stepwise — see the header comment
+  for what the literature dictated and which rules are deliberately absent. UI: `MelodyLane` (rows tinted
   chord tone / scale tone / off-scale per bar, click to add, drag to move or lengthen,
   click to delete) and `MelodySection` (resolution, generate, surprise, clear).
 
@@ -171,7 +174,7 @@ Still unaddressed from the list above: vendored soundfont and self-hosted fonts,
 
 ```bash
 npm run dev                # dev server
-npx vitest run             # 190 tests
+npx vitest run             # 195 tests
 npx tsc --noEmit           # typecheck
 npm run build              # production build
 cd data && uv run pytest -q # 20 pipeline tests
