@@ -318,6 +318,15 @@
   font-weight: 600;
   line-height: 1.1;
   color: var(--ink);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chord-face__roman--long {
+  font-size: 14px;
+  letter-spacing: -0.03em;
 }
 
 .chord-face__name {
@@ -535,15 +544,19 @@
 
 .grid-slot__quality-select {
   position: absolute;
-  bottom: 4px;
-  right: 4px;
+  bottom: 5px;
+  left: 6px;
+  right: 6px;
+  width: calc(100% - 12px);
+  box-sizing: border-box;
   font-family: var(--font-mono);
   font-size: 10px;
+  line-height: 1.2;
   color: var(--ink-dim);
   background: var(--bg-1);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 1px 3px;
+  padding: 2px 4px;
   cursor: pointer;
   z-index: 2;
 }
@@ -556,7 +569,7 @@
 
 .grid-slot__index {
   position: absolute;
-  bottom: 4px;
+  top: 4px;
   left: 7px;
   font-family: var(--font-mono);
   font-size: 9px;
