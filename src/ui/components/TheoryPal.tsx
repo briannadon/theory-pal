@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { playProgression, type Playback } from '../../audio/index.ts';
 import { exportMidiFile } from '../../midi/index.ts';
 import { suggest, surprise, type Suggestion } from '../../model/index.ts';
-import { toAbsolute, voiceChord, type Key, type RelChord } from '../../theory/index.ts';
+import { toAbsolute, voiceChord, type ChordQuality, type Key, type RelChord } from '../../theory/index.ts';
 import { useAudioEngine } from '../hooks/useAudioEngine.ts';
 import { useMidiOut } from '../hooks/useMidiOut.ts';
 import { useModel } from '../hooks/useModel.ts';
@@ -207,6 +207,14 @@ export function TheoryPal() {
     URL.revokeObjectURL(url);
   }, [grid.slots, key, bpm]);
 
+  const handleModifyQualitySlot = useCallback((index: number, quality: ChordQuality) => {
+    setGrid((g) => {
+      const existing = g.slots[index];
+      if (!existing) return g;
+      return setSlot(g, index, { ...existing, quality });
+    });
+  }, []);
+
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="tp-app">
@@ -235,6 +243,7 @@ export function TheoryPal() {
             onClearGrid={() => setGrid((g) => createGrid(g.size))}
             onAuditionSlot={handleAudition}
             onClearSlot={(idx: number) => setGrid((g) => clearSlot(g, idx))}
+            onModifyQualitySlot={handleModifyQualitySlot}
           />
         </main>
 

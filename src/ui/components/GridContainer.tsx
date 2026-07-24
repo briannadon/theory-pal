@@ -7,6 +7,7 @@ import {
   isDiatonic,
   romanNumeral,
   toAbsolute,
+  type ChordQuality,
   type Key,
   type RelChord,
 } from '../../theory/index.ts';
@@ -22,6 +23,7 @@ export interface GridContainerProps {
   onClearGrid: () => void;
   onAuditionSlot: (chord: RelChord) => void;
   onClearSlot: (index: number) => void;
+  onModifyQualitySlot?: (index: number, quality: ChordQuality) => void;
 }
 
 const SIZES: GridSize[] = [4, 8, 16];
@@ -34,6 +36,7 @@ export function GridContainer({
   onClearGrid,
   onAuditionSlot,
   onClearSlot,
+  onModifyQualitySlot,
 }: GridContainerProps) {
   const slotIds = state.slots.map((_, i) => slotId(i));
   const hasChords = state.slots.some((s) => s !== null);
@@ -94,6 +97,7 @@ export function GridContainer({
                   if (chord !== null) onAuditionSlot(chord);
                 }}
                 onClear={() => onClearSlot(i)}
+                onModifyQuality={(q) => onModifyQualitySlot?.(i, q)}
               />
             );
           })}

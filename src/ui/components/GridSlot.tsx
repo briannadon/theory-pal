@@ -1,11 +1,6 @@
-// One bar-slot in the progression grid: a sortable (dnd-kit) drag source/
-// drop target for reordering, and also a valid drop target for chords
-// dragged in from either strip (TheoryPal's onDragEnd tells the two apart
-// via `active.data.current.source`). Click auditions a filled slot; the
-// small "x" clears it.
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { RelChord } from '../../theory/index.ts';
+import type { ChordQuality, RelChord } from '../../theory/index.ts';
 import { ChordFace, type ChordAccent } from './ChordFace.tsx';
 
 export interface GridSlotProps {
@@ -18,9 +13,21 @@ export interface GridSlotProps {
   isPlaying: boolean;
   onAudition: () => void;
   onClear: () => void;
+  onModifyQuality?: (quality: ChordQuality) => void;
 }
 
-export function GridSlot({ id, index, chord, roman, name, accent, isPlaying, onAudition, onClear }: GridSlotProps) {
+export function GridSlot({
+  id,
+  index,
+  chord,
+  roman,
+  name,
+  accent,
+  isPlaying,
+  onAudition,
+  onClear,
+  onModifyQuality,
+}: GridSlotProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
     data: { source: 'grid', index },
@@ -57,6 +64,32 @@ export function GridSlot({ id, index, chord, roman, name, accent, isPlaying, onA
         >
           ×
         </button>
+      )}
+      {chord && onModifyQuality && (
+        <select
+          className="grid-slot__quality-select"
+          value={chord.quality}
+          aria-label={`Modify quality for bar ${index + 1}`}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            e.stopPropagation();
+            onModifyQuality(e.target.value as ChordQuality);
+          }}
+        >
+          <option value="maj">maj</option>
+          <option value="min">min</option>
+          <option value="dom7">dom7</option>
+          <option value="maj7">maj7</option>
+          <option value="min7">min7</option>
+          <option value="m7b5">m7b5</option>
+          <option value="dim7">dim7</option>
+          <option value="sus2">sus2</option>
+          <option value="sus4">sus4</option>
+          <option value="dom7sus4">dom7sus4</option>
+          <option value="dim">dim</option>
+          <option value="aug">aug</option>
+        </select>
       )}
       <span className="grid-slot__index">{index + 1}</span>
     </div>
