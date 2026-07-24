@@ -240,6 +240,7 @@
   overflow-x: auto;
   padding-bottom: 4px;
   scrollbar-width: thin;
+  align-items: flex-start;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -384,22 +385,41 @@
   background: var(--accent-diatonic);
 }
 
+.tp-surprise-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  flex: none;
+}
+
 .tp-reroll-btn {
-  position: absolute;
-  top: 6px;
-  right: 6px;
   all: unset;
   cursor: pointer;
-  font-size: 13px;
-  line-height: 1;
-  color: var(--ink-dim);
-  padding: 3px;
-  border-radius: 4px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  padding: 6px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent-surprise);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .tp-reroll-btn:hover {
-  color: var(--ink);
   background: var(--bg-3);
+  border-color: var(--accent-surprise);
+  color: var(--ink);
 }
 
 .tp-surprise-label {

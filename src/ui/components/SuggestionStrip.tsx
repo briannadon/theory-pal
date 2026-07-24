@@ -64,37 +64,28 @@ function SurpriseCell({ keyValue, suggestion, onAudition, onReroll }: SurpriseCe
   });
 
   return (
-    <button
-      type="button"
-      ref={setNodeRef}
-      className={`strip-cell${isDragging ? ' strip-cell--dragging' : ''}`}
-      onClick={() => onAudition(suggestion.chord)}
-      aria-label={`Surprise me: ${roman}, ${name}. Click to audition, drag to add to the grid, or reroll for a different suggestion.`}
-      {...attributes}
-      {...listeners}
-    >
-      <ChordFace roman={roman} name={name} accent="surprise">
-        <span className="tp-surprise-label">surprise</span>
-        <span
-          role="button"
-          tabIndex={0}
-          className="tp-reroll-btn"
-          aria-label="Reroll surprise suggestion"
-          onClick={(e) => {
-            e.stopPropagation();
-            onReroll();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.stopPropagation();
-              e.preventDefault();
-              onReroll();
-            }
-          }}
-        >
-          ⟳
-        </span>
-      </ChordFace>
-    </button>
+    <div className="tp-surprise-cell">
+      <button
+        type="button"
+        ref={setNodeRef}
+        className={`strip-cell${isDragging ? ' strip-cell--dragging' : ''}`}
+        onClick={() => onAudition(suggestion.chord)}
+        aria-label={`Surprise me: ${roman}, ${name}. Click to audition or drag to add to the grid.`}
+        {...attributes}
+        {...listeners}
+      >
+        <ChordFace roman={roman} name={name} accent="surprise">
+          <span className="tp-surprise-label">surprise</span>
+        </ChordFace>
+      </button>
+      <button
+        type="button"
+        className="tp-reroll-btn"
+        aria-label="Reroll surprise suggestion"
+        onClick={onReroll}
+      >
+        ⟳ reroll
+      </button>
+    </div>
   );
 }
