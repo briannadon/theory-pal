@@ -324,11 +324,6 @@
   white-space: nowrap;
 }
 
-.chord-face__roman--long {
-  font-size: 14px;
-  letter-spacing: -0.03em;
-}
-
 .chord-face__name {
   font-family: var(--font-mono);
   font-size: 12px;
@@ -488,7 +483,7 @@
 
 .tp-grid__cells {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: 8px;
 }
 

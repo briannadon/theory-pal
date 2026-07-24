@@ -26,15 +26,11 @@ export function ChordFace({
   placeholder,
   children,
 }: ChordFaceProps) {
-  const isLongRoman = roman ? roman.length >= 5 : false;
-
   return (
     <div className={`chord-face chord-face--${accent}`}>
       {roman ? (
         <>
-          <span className={`chord-face__roman${isLongRoman ? ' chord-face__roman--long' : ''}`}>
-            {roman}
-          </span>
+          <span className="chord-face__roman">{roman}</span>
           {name && <span className="chord-face__name">{name}</span>}
           {probability !== undefined && (
             <span className="chord-face__prob">
