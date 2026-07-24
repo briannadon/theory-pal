@@ -36,8 +36,22 @@ export type ChordQuality =
   | 'maj' | 'min' | 'dim' | 'aug'
   | 'maj7' | 'min7' | 'dom7' | 'm7b5' | 'dim7' | 'minMaj7'
   | 'sus2' | 'sus4' | 'dom7sus4';
-// v1 vocabulary. Extensions (9/11/13/add9) land post-MVP as ADDITIONAL members;
-// the model collapses them onto these bases, so do not renumber or repurpose.
+// Base vocabulary — closed. Extensions do NOT add members here: sus x seventh x
+// ninth would be 12 spellings per degree. They ride alongside as `mods` (below),
+// which `stateKey` ignores, so the trained model never sees them.
+
+/** Alterations layered on a base quality. `sus` replaces the third; `ninth`
+ * adds a 9th. Note "add the 7th" is not a mod — it means the degree's
+ * *diatonic* 7th, which only the key knows, so callers pick the 7th quality
+ * from `diatonicChords(key, true)` instead. */
+export interface ChordMods { sus?: 2 | 4; ninth?: boolean; }
+
+/** A chord's makeup after mods, in the terms name renderers care about. */
+export interface ChordShape {
+  third: 'maj' | 'min' | 'sus2' | 'sus4' | 'none';
+  seventh: 'maj7' | 'b7' | 'bb7' | null;
+  ninth: boolean;
+}
 
 export type ScaleId =
   | 'ionian' | 'dorian' | 'phrygian' | 'lydian' | 'mixolydian' | 'aeolian' | 'locrian'
@@ -53,20 +67,29 @@ export interface Scale {
 export interface Key { tonic: PitchClass; scale: ScaleId; }
 
 /** Chord in relative (roman) space — the model's currency. */
-export interface RelChord { degree: number; quality: ChordQuality; } // degree = 0-11 semitones above tonic
+export interface RelChord { degree: number; quality: ChordQuality; mods?: ChordMods; } // degree = 0-11 semitones above tonic
 
 /** Chord in absolute space — display and sound. */
-export interface AbsChord { root: PitchClass; quality: ChordQuality; inversion?: number; }
+export interface AbsChord { root: PitchClass; quality: ChordQuality; inversion?: number; mods?: ChordMods; }
 
-export function stateKey(c: RelChord): string;              // "10:maj"
+export function stateKey(c: RelChord): string;              // "10:maj"; IGNORES mods by design
 export function parseStateKey(k: string): RelChord;
-export function toAbsolute(c: RelChord, key: Key): AbsChord;
-export function toRelative(c: AbsChord, key: Key): RelChord;
-export function chordName(c: AbsChord): string;             // "C#m7", spelling-aware
-export function romanNumeral(c: RelChord, key: Key): string; // "bVII", "iv", "V7"
-export function isDiatonic(c: RelChord, key: Key): boolean;  // UI marks false with accent color
+export function toAbsolute(c: RelChord, key: Key): AbsChord;   // carries mods through
+export function toRelative(c: AbsChord, key: Key): RelChord;   // carries mods through
+export function chordName(c: AbsChord): string;             // "C#m7", "Cmaj9", "G9sus4", spelling-aware
+export function romanNumeral(c: RelChord, key: Key): string; // "bVII", "iv", "V7", "ii9", "Iadd9"
+export function isDiatonic(c: RelChord, key: Key): boolean;  // base quality only; UI marks false with accent color
 export function diatonicChords(key: Key, sevenths?: boolean): RelChord[]; // 7 chords, top strip
 export function chordPitches(c: AbsChord): PitchClass[];
+
+/** Semitone offsets with `mods` applied — the single source of truth for what a
+ * modified chord *is*. Unmodified chords return QUALITY_INTERVALS[quality]
+ * unchanged. Every consumer (pitches, voicing, both name renderers) derives
+ * from this rather than reading QUALITY_INTERVALS directly. */
+export function chordIntervals(quality: ChordQuality, mods?: ChordMods): number[];
+/** The chord's makeup in naming terms, so name renderers don't each re-derive
+ * "does this still have a third?" from raw intervals. */
+export function chordShape(quality: ChordQuality, mods?: ChordMods): ChordShape;
 
 /** Voicing: sequence of chords -> concrete MIDI notes, minimizing voice movement. */
 export interface VoicedChord { notes: number[]; }            // MIDI note numbers, sorted
@@ -133,14 +156,20 @@ export function theoryPrior(key: Key, context: RelChord[]): Map<string, number>;
 
 ```ts
 export interface AudioEngine {
-  init(): Promise<void>;                 // lazy; loads soundfont on first use
+  preload(): Promise<void>;              // fetch/decode samples; NO user gesture needed
+  init(): Promise<void>;                 // preload() + the gesture-gated context resume()
   playChord(notes: number[], durationSec?: number, velocity?: number): void;
   playAt(notes: number[], whenSec: number, durationSec: number, velocity?: number): void;
-  stopAll(): void;
+  stopAll(): void;                       // silence sounding voices AND drop queued ones
   setEnabled(on: boolean): void;         // internal-piano bypass toggle
   readonly currentTime: number;          // AudioContext.currentTime
 }
 ```
+Two-phase startup: decoding samples does not need a running AudioContext, so the
+multi-second download starts on mount (the UI gates interaction until it resolves)
+and only `resume()` waits for a user gesture. `stopAll` must also clear the
+instrument's own scheduler queue — `playAt` schedules a whole bar ahead, and
+releasing only started voices would let the rest of the bar play out after Stop.
 Lookahead scheduler (25ms timer tick, 100ms schedule-ahead window) for playback; never
 `setTimeout` alone for note timing.
 

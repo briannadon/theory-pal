@@ -1,7 +1,8 @@
 # theory-pal handoff
 
-State as of 2026-07-23, end of the first build session. Read this with PLAN.md (scope
-and rationale) and SPEC.md (the interface contract every module builds against).
+State as of 2026-07-24. Read this with PLAN.md (scope and rationale) and SPEC.md (the
+interface contract every module builds against). The bulk of this file describes the
+first build session (2026-07-23); "Session 2" below records what changed after it.
 
 Repo: https://github.com/briannadon/theory-pal, deployed at
 https://briannadon.github.io/theory-pal/ (currently still serving the Vite scaffold,
@@ -10,7 +11,7 @@ see "Where the UI left off").
 ## Where things stand
 
 M0 through M3 are done except for the spikes that need the user's hardware and the UI
-wiring. 140 tests pass, `npx tsc --noEmit` is clean, and the deploy pipeline is green
+wiring. 157 tests pass, `npx tsc --noEmit` is clean, and the deploy pipeline is green
 end to end.
 
 | Milestone | State |
@@ -114,20 +115,46 @@ fixable by threading `Key` through the signature.
 **The model ships trained on 15k songs, not 680k.** This was the user's call for this
 session. The full run is a single flag and about 37 minutes.
 
-**`loadModel` returns `Promise<TransitionModel | null>`**, a deliberate deviation from
-SPEC.md's literal signature so a failed fetch degrades to prior-only suggestions instead
-of throwing. SPEC.md has not been updated to match; do that or change the code.
-
 **M0 spikes are unrun.** Nothing has verified Web MIDI from Firefox into Reaper on real
 hardware, and no one has listened to the piano. `docs/M0-spikes.md` is the checklist.
 The riskiest unknown is Firefox's per-site Web MIDI permission add-on, which only
 appears on a deployed origin, never on localhost.
 
+## Session 2 (2026-07-24)
+
+Four changes, all committed and pushed to `master`:
+
+- **In-key modifiers replace the family selector.** Triads/7ths/Sus became four
+  stackable toggles: sus2 and sus4 (mutually exclusive — both replace the third), 7,
+  and 9, freely combined. The quality union stayed closed; alterations ride alongside
+  it as `RelChord.mods` (`ChordMods` in SPEC.md), which `stateKey` ignores, so the
+  trained model is untouched and `model/` needed no changes at all. `chordIntervals`
+  is now the single source of truth for a chord's tones; `chordPitches`, `voiceChord`,
+  `chordName`, and `romanNumeral` all derive from it, with an identity fast path that
+  leaves unmodified chords byte-identical. The 7 toggle is deliberately *not* a mod:
+  it means the degree's diatonic 7th, so it selects `diatonicChords(key, true)`.
+  Modifiers exist on the strip only — a chord freezes as-is when dropped in the grid.
+- **The soundfont preloads.** `AudioEngine` split into `preload()` (fetch/decode, no
+  user gesture) and `init()` (preload plus the gesture-gated `resume()`).
+  `useAudioEngine` fires `preload()` on mount and exposes a load status;
+  `SoundOverlay` blocks the UI until it resolves, with a dismissible failure branch so
+  a dead soundfont doesn't lock the user out of MIDI and export.
+- **Stop is immediate.** `playProgression` hands smplr a whole bar of timestamped
+  notes at once, and smplr's `stop()` only releases *started* voices, so the rest of
+  the bar kept playing after Stop. `AudioEngine.stopAll` now clears smplr's scheduler
+  queue first.
+- **Grid drag/drop no longer double-animates.** Slot ids are positional, so dnd-kit's
+  default layout animation replayed the reorder the drag preview had already shown;
+  `animateLayoutChanges: () => false` on the sortable settles it in place.
+
+Still unaddressed from the list above: vendored soundfont and self-hosted fonts,
+`chordName` key context, the 15k-song model, and the M0 hardware spikes.
+
 ## Commands
 
 ```bash
 npm run dev                # dev server
-npx vitest run             # 140 tests
+npx vitest run             # 157 tests
 npx tsc --noEmit           # typecheck
 npm run build              # production build
 cd data && uv run pytest -q # 20 pipeline tests

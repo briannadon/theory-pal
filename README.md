@@ -8,7 +8,7 @@ A browser-based chord progression assistant: select a key and scale, get corpus-
 - **In-key chord modifiers**: Stack sus2/sus4 (mutually exclusive), 7, and 9 onto the "In key" row; every diatonic chord re-renders with the modifiers applied.
 - **Corpus-driven suggestions**: Next-chord recommendations ranked by probability, trained on a real chord progression corpus with an Order-3 Markov model and theory-rule fallback.
 - **Non-diatonic chords**: Borrowed chords, secondary dominants, and modal mixture are always available, not filtered out.
-- **Built-in piano sound**: Audition chords with Web Audio and a SoundFont player.
+- **Built-in piano sound**: Audition chords with Web Audio and a SoundFont player. Samples load on page open, so the first chord you click sounds immediately.
 - **Live MIDI output**: Send chord progressions to a DAW or hardware synthesizer via Web MIDI.
 - **Progression grid & direct chord editing**: Drag chords into a 4/8/16-slot grid, modify individual chord qualities directly via inline selectors, reorder slots, and hear the result.
 - **MIDI export**: Save progressions as `.mid` files.

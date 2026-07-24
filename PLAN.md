@@ -55,11 +55,12 @@ Reaper goes through a virtual ALSA/JACK port that the browser targets via Web MI
   modes. Data-driven (interval patterns), so adding scales is a table entry.
 - Chord representation: root as scale degree + quality. v1 vocabulary: triads
   (maj/min/dim/aug), 7ths (maj7/min7/dom7/m7b5/dim7), sus2/sus4. Extensions (9/11/13,
-  add9) are the first post-MVP priority (user specifically wants 9th chords); design
-  the quality type and the model's state mapping now so extensions slot in without a
-  schema break. Workable approach: model states collapse extended chords onto their
-  7th/triad base for transition statistics, while the voicing/audition layer renders
-  the full extension, so 9ths are playable before the corpus states get them.
+  add9) were the first post-MVP priority (user specifically wants 9th chords).
+  **Shipped for sus/7/9**: the quality union stayed closed and alterations ride
+  alongside it as `ChordMods` (see SPEC.md), which `stateKey` ignores — so model
+  states collapse onto the 7th/triad base for transition statistics while the
+  voicing/audition layer renders the full extension, exactly as planned, with no
+  schema break. 11ths/13ths would extend `ChordMods` the same way.
   Both absolute (C#m7) and relative (iv7 in G# minor) forms, with conversion in both
   directions given a key.
 - Voicing engine: convert a chord sequence to concrete MIDI note numbers with basic
@@ -169,9 +170,11 @@ end-to-end before running the full corpus.
   annotations served the same purpose.
 - M3. **DONE**. Key picker, diatonic and suggestion strips, chord cells, hooks, grid container, transport, MIDI port picker, and top-level `TheoryPal` layout in `src/App.tsx`.
 - M4. **DONE**. Progression grid container, drag-and-drop slot reordering, playback lookahead scheduler, Web MIDI out, and `.mid` export fully implemented and verified. Deploy pipeline is green: Pages is enabled, GitHub Actions builds and publishes on push.
-- M5 (first post-MVP work, in priority order): extended chords (9ths first, then
-  11/13/add) surfaced in strips, grid, and voicing; suggestion blend tuning; strum/arp
-  patterns; progression save/share (URL-encoded state is enough, still no backend).
+- M5 (post-MVP, in priority order). **PARTLY DONE**: the in-key strip's family
+  selector became stackable sus2/sus4/7/9 modifiers, carried through naming, roman
+  numerals, voicing, audition, and export. Remaining: 11ths/13ths (same `ChordMods`
+  mechanism); suggestion blend tuning; strum/arp patterns and melody/lead support;
+  progression save/share (URL-encoded state is enough, still no backend).
 
 ## Prior art (and why not just use it)
 
@@ -199,6 +202,9 @@ with probabilities, live MIDI out on Linux, open data pipeline.
 - Suggestion display: ranked list with percentages, plus a "surprise me" slot.
 - Two-strip layout (diatonic on top, suggestions below), Scaler-like simplicity.
 - Voice leading in v1; strum/arp is a stretch goal.
+- (2026-07-24) In-key chords are built by stacking modifiers — sus2/sus4 mutually
+  exclusive, 7 and 9 independent — rather than picking one prebuilt family. Modifiers
+  live on the strip only; a chord is frozen as-is when dropped into the grid.
 - No drag-out; `Export .mid` is sufficient.
 - Built-in simple piano sound with a bypass toggle.
 - Extensions (esp. 9ths) are the top post-MVP feature.
