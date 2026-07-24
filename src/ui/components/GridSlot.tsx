@@ -28,10 +28,17 @@ export function GridSlot({
   onClear,
   onModifyQuality,
 }: GridSlotProps) {
+  // Slot ids/keys are positional (`slot-0`…`slot-n`), so a reorder moves the
+  // chord *content* between DOM nodes that themselves never move. dnd-kit's
+  // default layout animation doesn't know that: on drop it measures the "new"
+  // layout and slides each node from its dragging transform to its rest
+  // position — replaying the shuffle the drag preview already showed. Opting
+  // out makes the drop resolve instantly into the previewed arrangement.
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
     data: { source: 'grid', index },
     disabled: !chord,
+    animateLayoutChanges: () => false,
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
