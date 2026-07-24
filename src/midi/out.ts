@@ -125,7 +125,7 @@ export class WebMidiOut implements MidiOut {
     durationMs: number,
     velocity = DEFAULT_VELOCITY,
     whenMs?: number,
-    channel = MIDI_CHANNEL.chords,
+    channel: number = MIDI_CHANNEL.chords,
   ): void {
     if (!this.output || notes.length === 0) return;
     const ch = channel & 0x0f;

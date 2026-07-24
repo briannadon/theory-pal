@@ -23,6 +23,7 @@ import {
   voiceChord,
   DEFAULT_BAR_STYLE,
   type BarStyle,
+  type ChordMods,
   type ChordQuality,
   type Key,
   type MelodyLane,
@@ -265,16 +266,20 @@ export function TheoryPal() {
     URL.revokeObjectURL(url);
   }, [grid.slots, key, bpm, style, melody]);
 
-  // Picking a quality by hand replaces the chord outright, dropping any
-  // modifiers it arrived with: the dropdown lists base qualities, so keeping
-  // e.g. a sus4 mod would silently contradict the quality just chosen.
-  const handleModifyQualitySlot = useCallback((index: number, quality: ChordQuality) => {
-    setGrid((g) => {
-      const existing = g.slots[index];
-      if (!existing) return g;
-      return setSlot(g, index, { degree: existing.degree, quality });
-    });
-  }, []);
+  // Picking from the dropdown replaces the chord's quality *and* modifiers
+  // with exactly what was chosen: the list carries its own mods (9ths are a
+  // base quality plus `ninth`), so keeping the old ones would silently
+  // contradict the selection.
+  const handleModifyQualitySlot = useCallback(
+    (index: number, quality: ChordQuality, mods?: ChordMods) => {
+      setGrid((g) => {
+        const existing = g.slots[index];
+        if (!existing) return g;
+        return setSlot(g, index, { degree: existing.degree, quality, ...(mods && { mods }) });
+      });
+    },
+    [],
+  );
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>

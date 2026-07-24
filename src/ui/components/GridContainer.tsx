@@ -7,6 +7,7 @@ import {
   isDiatonic,
   romanNumeral,
   toAbsolute,
+  type ChordMods,
   type ChordQuality,
   type Key,
   type RelChord,
@@ -23,7 +24,7 @@ export interface GridContainerProps {
   onClearGrid: () => void;
   onAuditionSlot: (chord: RelChord) => void;
   onClearSlot: (index: number) => void;
-  onModifyQualitySlot?: (index: number, quality: ChordQuality) => void;
+  onModifyQualitySlot?: (index: number, quality: ChordQuality, mods?: ChordMods) => void;
   onHoverSlot?: (index: number | null) => void;
 }
 
@@ -99,7 +100,7 @@ export function GridContainer({
                   if (chord !== null) onAuditionSlot(chord);
                 }}
                 onClear={() => onClearSlot(i)}
-                onModifyQuality={(q) => onModifyQualitySlot?.(i, q)}
+                onModifyQuality={(q, mods) => onModifyQualitySlot?.(i, q, mods)}
                 onHoverChange={(hovering) => onHoverSlot?.(hovering ? i : null)}
               />
             );

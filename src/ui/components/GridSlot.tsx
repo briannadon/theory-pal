@@ -1,7 +1,56 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { ChordQuality, RelChord } from '../../theory/index.ts';
+import { chordName, type ChordMods, type ChordQuality, type RelChord } from '../../theory/index.ts';
 import { ChordFace, type ChordAccent } from './ChordFace.tsx';
+
+// The qualities a slot can be switched to by hand. 9ths are not members of
+// ChordQuality — they are a base quality plus `mods.ninth` (see SPEC.md) — so
+// an option carries both, and its stored value encodes both.
+//
+// Labels are derived rather than typed out: `chordName` on a C root gives the
+// exact chord-symbol suffix the tile itself displays, so the dropdown can
+// never drift out of step with the face above it.
+interface QualityOption {
+  value: string;
+  label: string;
+  quality: ChordQuality;
+  mods?: ChordMods;
+}
+
+const NINTH: ChordMods = { ninth: true };
+
+function optionValue(quality: ChordQuality, mods?: ChordMods): string {
+  return mods?.ninth ? `${quality}+9` : quality;
+}
+
+function option(quality: ChordQuality, mods?: ChordMods): QualityOption {
+  const symbol = chordName({ root: 0, quality, mods }).slice(1); // drop the "C"
+  return { value: optionValue(quality, mods), label: symbol || 'maj', quality, mods };
+}
+
+const QUALITY_OPTIONS: QualityOption[] = [
+  option('maj'),
+  option('min'),
+  option('dom7'),
+  option('maj7'),
+  option('min7'),
+  option('m7b5'),
+  option('dim7'),
+  option('minMaj7'),
+  option('sus2'),
+  option('sus4'),
+  option('dom7sus4'),
+  option('dim'),
+  option('aug'),
+  // Added tones and true 9ths, in the same order as their base qualities.
+  option('maj', NINTH), // add9
+  option('min', NINTH), // m(add9)
+  option('dom7', NINTH), // 9
+  option('maj7', NINTH), // maj9
+  option('min7', NINTH), // m9
+  option('m7b5', NINTH), // m9b5
+  option('dom7sus4', NINTH), // 9sus4
+];
 
 export interface GridSlotProps {
   id: string;
@@ -13,7 +62,7 @@ export interface GridSlotProps {
   isPlaying: boolean;
   onAudition: () => void;
   onClear: () => void;
-  onModifyQuality?: (quality: ChordQuality) => void;
+  onModifyQuality?: (quality: ChordQuality, mods?: ChordMods) => void;
   /** Hovering a chord tile resolves the melody lane to that chord — see
    * MelodyLane. Reported here rather than derived there so both the tile and
    * the lane's own bar segment drive the same highlight. */
@@ -46,6 +95,7 @@ export function GridSlot({
     animateLayoutChanges: () => false,
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
+  const currentValue = chord ? optionValue(chord.quality, chord.mods) : '';
 
   return (
     <div
@@ -82,27 +132,30 @@ export function GridSlot({
       {chord && onModifyQuality && (
         <select
           className="grid-slot__quality-select"
-          value={chord.quality}
+          value={currentValue}
           aria-label={`Modify quality for bar ${index + 1}`}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           onChange={(e) => {
             e.stopPropagation();
-            onModifyQuality(e.target.value as ChordQuality);
+            const picked = QUALITY_OPTIONS.find((o) => o.value === e.target.value);
+            if (picked) onModifyQuality(picked.quality, picked.mods);
           }}
         >
-          <option value="maj">maj</option>
-          <option value="min">min</option>
-          <option value="dom7">dom7</option>
-          <option value="maj7">maj7</option>
-          <option value="min7">min7</option>
-          <option value="m7b5">m7b5</option>
-          <option value="dim7">dim7</option>
-          <option value="sus2">sus2</option>
-          <option value="sus4">sus4</option>
-          <option value="dom7sus4">dom7sus4</option>
-          <option value="dim">dim</option>
-          <option value="aug">aug</option>
+          {/* A chord dragged in with modifiers the list doesn't cover (a sus'd
+              7th, say) still has to show what it is, so it gets a disabled
+              entry of its own rather than silently reading as its base
+              quality. */}
+          {!QUALITY_OPTIONS.some((o) => o.value === currentValue) && (
+            <option value={currentValue} disabled>
+              {chordName({ root: 0, quality: chord.quality, mods: chord.mods }).slice(1) || 'maj'}
+            </option>
+          )}
+          {QUALITY_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
         </select>
       )}
       <span className="grid-slot__index">{index + 1}</span>
