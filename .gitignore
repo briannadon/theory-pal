@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# data/ pipeline (uv-managed Python, not shipped with the web app)
+data/.venv
+data/.cache/
+data/__pycache__/
+data/**/__pycache__/
+data/.pytest_cache/
