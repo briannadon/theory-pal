@@ -145,3 +145,48 @@ describe('exportMidiFile', () => {
     expect(track[track.length - 1].type).toBe('endOfTrack');
   });
 });
+
+describe('exportMidiFile with a melody', () => {
+  const cMaj: AbsChord = { root: 0, quality: 'maj' };
+
+  const melody = [
+    [{ note: 72, startBeat: 0, durationBeats: 1, velocity: 88 }],
+    [{ note: 74, startBeat: 2, durationBeats: 2, velocity: 88 }],
+  ];
+
+  it('splits chords and melody onto their own tracks and channels', async () => {
+    const parsed = await parse(exportMidiFile([cMaj, cMaj], 120, { melody }));
+
+    expect(parsed.header.format).toBe(1);
+    expect(parsed.tracks).toHaveLength(3);
+
+    // Track 0 carries tempo/meta only, the format-1 convention.
+    expect(parsed.tracks[0].some((e) => e.type === 'setTempo')).toBe(true);
+    expect(parsed.tracks[0].filter(isNoteOn)).toHaveLength(0);
+
+    const chordNotes = parsed.tracks[1].filter(isNoteOn);
+    const melodyNotes = parsed.tracks[2].filter(isNoteOn);
+    expect(chordNotes.length).toBeGreaterThan(0);
+    expect(melodyNotes.map((e) => e.noteNumber)).toEqual([72, 74]);
+
+    expect(new Set(chordNotes.map((e) => e.channel))).toEqual(new Set([0]));
+    expect(new Set(melodyNotes.map((e) => e.channel))).toEqual(new Set([1]));
+  });
+
+  it('places melody notes at their own offsets within the bar', async () => {
+    const parsed = await parse(exportMidiFile([cMaj, cMaj], 120, { melody }));
+    const ticks = absoluteTicks(parsed.tracks[2]);
+    const onIndices = parsed.tracks[2]
+      .map((e, i) => (isNoteOn(e) ? i : -1))
+      .filter((i) => i >= 0);
+
+    expect(ticks[onIndices[0]]).toBe(0); // bar 1, beat 1
+    expect(ticks[onIndices[1]]).toBe(480 * 4 + 480 * 2); // bar 2, beat 3
+  });
+
+  it('stays a single-track format-0 file when there is no melody', async () => {
+    const parsed = await parse(exportMidiFile([cMaj, cMaj], 120, { melody: [null, null] }));
+    expect(parsed.header.format).toBe(0);
+    expect(parsed.tracks).toHaveLength(1);
+  });
+});

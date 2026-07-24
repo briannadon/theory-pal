@@ -29,6 +29,9 @@ export interface TransportProps {
   onTogglePiano: () => void;
   style: BarStyle;
   onStyleChange: (style: BarStyle) => void;
+  chordVolume: number;
+  melodyVolume: number;
+  onVolumeChange: (voice: 'chords' | 'melody', level: number) => void;
   midiStatus: MidiAccessStatus;
   midiPorts: MidiPort[];
   selectedMidiPortId: string | null;
@@ -49,6 +52,9 @@ export function Transport({
   onTogglePiano,
   style,
   onStyleChange,
+  chordVolume,
+  melodyVolume,
+  onVolumeChange,
   midiStatus,
   midiPorts,
   selectedMidiPortId,
@@ -130,6 +136,31 @@ export function Transport({
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="tp-transport__group tp-transport__mixer">
+        <label>
+          <span className="tp-mixer__label">Chords</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round(chordVolume * 100)}
+            aria-label="Chord volume"
+            onChange={(e) => onVolumeChange('chords', Number(e.target.value) / 100)}
+          />
+        </label>
+        <label>
+          <span className="tp-mixer__label">Melody</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round(melodyVolume * 100)}
+            aria-label="Melody volume"
+            onChange={(e) => onVolumeChange('melody', Number(e.target.value) / 100)}
+          />
+        </label>
       </div>
 
       <div className="tp-transport__spacer" />

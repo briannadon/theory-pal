@@ -11,7 +11,7 @@ see "Where the UI left off").
 ## Where things stand
 
 M0 through M3 are done except for the spikes that need the user's hardware and the UI
-wiring. 195 tests pass, `npx tsc --noEmit` is clean, and the deploy pipeline is green
+wiring. 206 tests pass, `npx tsc --noEmit` is clean, and the deploy pipeline is green
 end to end.
 
 | Milestone | State |
@@ -162,10 +162,13 @@ Four changes, all committed and pushed to `master`:
   chord tone / scale tone / off-scale per bar, click to add, drag to move or lengthen,
   click to delete) and `MelodySection` (resolution, generate, surprise, clear).
 
-Worth knowing for the next session: the melody plays through the same piano and the
-same MIDI channel as the chords — there is no separate lead voice or channel yet, and
-`.mid` export writes one format-0 track. Splitting them (format 1, channel 2) is the
-obvious next step if the lead needs its own instrument.
+- **Chords and melody are separate parts end to end.** The audio engine builds one
+  smplr instrument per voice sharing a single sample loader (so the second voice costs
+  no download), each with its own output channel, which is what makes the mixer a true
+  fader rather than a velocity trick. Live MIDI puts chords on channel 1 and melody on
+  channel 2, faders send CC 7 per channel, and Stop panics both. `.mid` export stays a
+  format-0 single track for chords alone, and becomes format 1 — tempo track, chord
+  track, melody track — as soon as a melody exists.
 
 Still unaddressed from the list above: vendored soundfont and self-hosted fonts,
 `chordName` key context, the 15k-song model, and the M0 hardware spikes.
@@ -174,7 +177,7 @@ Still unaddressed from the list above: vendored soundfont and self-hosted fonts,
 
 ```bash
 npm run dev                # dev server
-npx vitest run             # 195 tests
+npx vitest run             # 206 tests
 npx tsc --noEmit           # typecheck
 npm run build              # production build
 cd data && uv run pytest -q # 20 pipeline tests

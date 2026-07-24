@@ -1,5 +1,7 @@
-// Standard MIDI file export (SPEC.md `src/midi/`): format 0, single track,
-// one chord per bar, null slots leave silence. Built on the `midi-file`
+// Standard MIDI file export (SPEC.md `src/midi/`): one chord per bar, null
+// slots leave silence. Format 0 and a single track when the progression is
+// chords alone; format 1 with a tempo track plus separate chord and melody
+// tracks (on separate channels) once there is a melody to separate. Built on the `midi-file`
 // package's `writeMidi` — it emits an intermediate `MidiData` object as raw
 // bytes; we build that object directly rather than writing SMF bytes by hand.
 //
@@ -8,6 +10,7 @@
 // sounds like what the grid's own audition would play, rather than flat
 // root-position triads.
 import { writeMidi, type MidiData, type MidiEvent } from 'midi-file';
+import { MIDI_CHANNEL } from './out.ts';
 import {
   renderBar,
   voiceProgression,
@@ -66,30 +69,33 @@ export function exportMidiFile(bars: (AbsChord | null)[], bpm: number, opts?: Ex
   // exported file is the same material playback schedules — an arpeggio or a
   // lead line exports without a second code path here.
   const style = opts?.style ?? SUSTAIN_STYLE;
-  const rawEvents: RawNoteEvent[] = [];
-  const emit = (barIndex: number, events: NoteEvent[]) => {
-    const barStart = barIndex * TICKS_PER_BAR;
-    for (const ev of events) {
-      const startTick = barStart + Math.round(ev.startBeat * TICKS_PER_BEAT);
-      const endTick = startTick + Math.round(ev.durationBeats * TICKS_PER_BEAT);
-      rawEvents.push({ tick: startTick, on: true, note: ev.note, velocity: ev.velocity });
-      rawEvents.push({ tick: endTick, on: false, note: ev.note, velocity: 0 });
+  const collect = (source: (barIndex: number) => NoteEvent[] | null): RawNoteEvent[] => {
+    const raw: RawNoteEvent[] = [];
+    for (let barIndex = 0; barIndex < bars.length; barIndex++) {
+      const events = source(barIndex);
+      if (!events) continue;
+      const barStart = barIndex * TICKS_PER_BAR;
+      for (const ev of events) {
+        const startTick = barStart + Math.round(ev.startBeat * TICKS_PER_BEAT);
+        const endTick = startTick + Math.round(ev.durationBeats * TICKS_PER_BEAT);
+        raw.push({ tick: startTick, on: true, note: ev.note, velocity: ev.velocity });
+        raw.push({ tick: endTick, on: false, note: ev.note, velocity: 0 });
+      }
     }
+    // Stable, deterministic order: by tick, note-offs before note-ons at the
+    // same tick (so a note ending exactly when another with the same number
+    // begins doesn't produce an overlapping on/on or an out-of-order off after
+    // on), then by note number.
+    return raw.sort((a, b) => a.tick - b.tick || Number(a.on) - Number(b.on) || a.note - b.note);
   };
 
-  for (const [barIndex, notes] of notesByBar) {
-    emit(barIndex, renderBar({ notes }, style, BEATS_PER_BAR));
-  }
-  opts?.melody?.forEach((events, barIndex) => {
-    if (events && events.length > 0) emit(barIndex, events);
+  const chordEvents = collect((barIndex) => {
+    const notes = notesByBar.get(barIndex);
+    return notes ? renderBar({ notes }, style, BEATS_PER_BAR) : null;
   });
-  // Stable, deterministic order: by tick, note-offs before note-ons at the
-  // same tick (so a note ending exactly when another with the same number
-  // begins doesn't produce an overlapping on/on or an out-of-order off after
-  // on), then by note number.
-  rawEvents.sort((a, b) => a.tick - b.tick || Number(a.on) - Number(b.on) || a.note - b.note);
+  const melodyEvents = collect((barIndex) => opts?.melody?.[barIndex] ?? null);
 
-  const track: MidiEvent[] = [
+  const meta: MidiEvent[] = [
     { deltaTime: 0, meta: true, type: 'setTempo', microsecondsPerBeat },
     {
       deltaTime: 0,
@@ -102,26 +108,49 @@ export function exportMidiFile(bars: (AbsChord | null)[], bpm: number, opts?: Ex
     },
   ];
 
-  let lastTick = 0;
-  for (const ev of rawEvents) {
-    const deltaTime = ev.tick - lastTick;
-    lastTick = ev.tick;
-    track.push({
-      deltaTime,
-      channel: 0,
-      type: ev.on ? 'noteOn' : 'noteOff',
-      noteNumber: ev.note,
-      velocity: ev.on ? ev.velocity : 0,
-    });
-  }
-
   const totalTicks = bars.length * TICKS_PER_BAR;
-  track.push({ deltaTime: Math.max(0, totalTicks - lastTick), meta: true, type: 'endOfTrack' });
-
-  const midiData: MidiData = {
-    header: { format: 0, numTracks: 1, ticksPerBeat: TICKS_PER_BEAT },
-    tracks: [track],
+  const buildTrack = (
+    head: MidiEvent[],
+    events: RawNoteEvent[],
+    channel: number,
+    name?: string,
+  ): MidiEvent[] => {
+    const track: MidiEvent[] = [...head];
+    if (name) track.unshift({ deltaTime: 0, meta: true, type: 'trackName', text: name });
+    let lastTick = 0;
+    for (const ev of events) {
+      const deltaTime = ev.tick - lastTick;
+      lastTick = ev.tick;
+      track.push({
+        deltaTime,
+        channel,
+        type: ev.on ? 'noteOn' : 'noteOff',
+        noteNumber: ev.note,
+        velocity: ev.on ? ev.velocity : 0,
+      });
+    }
+    track.push({ deltaTime: Math.max(0, totalTicks - lastTick), meta: true, type: 'endOfTrack' });
+    return track;
   };
+
+  // With no melody there is one part, so a format-0 single-track file is the
+  // honest representation (and what every consumer of this function got
+  // before melodies existed). A melody makes it genuinely multi-track: chords
+  // and lead land on separate tracks and separate channels, so a DAW can give
+  // them different instruments — the same split playback uses live.
+  const midiData: MidiData = melodyEvents.length
+    ? {
+        header: { format: 1, numTracks: 3, ticksPerBeat: TICKS_PER_BEAT },
+        tracks: [
+          buildTrack(meta, [], MIDI_CHANNEL.chords, 'theory-pal'),
+          buildTrack([], chordEvents, MIDI_CHANNEL.chords, 'Chords'),
+          buildTrack([], melodyEvents, MIDI_CHANNEL.melody, 'Melody'),
+        ],
+      }
+    : {
+        header: { format: 0, numTracks: 1, ticksPerBeat: TICKS_PER_BEAT },
+        tracks: [buildTrack(meta, chordEvents, MIDI_CHANNEL.chords)],
+      };
 
   const bytes = writeMidi(midiData);
   return new Blob([new Uint8Array(bytes)], { type: 'audio/midi' });

@@ -37,13 +37,25 @@ function fakeAudioEngine(): AudioEngine & { playAtCalls: unknown[]; stopAllCalls
     preload: vi.fn(async () => {}),
     init: vi.fn(async () => {}),
     playChord: vi.fn(),
-    playAt: vi.fn((notes: number[], whenSec: number, durationSec: number, velocity?: number) => {
-      playAtCalls.push({ notes, whenSec, durationSec, velocity });
-    }),
+    // Voice and channel are recorded only when they differ from the default
+    // ('chords' / channel 0), so the timing assertions below stay about
+    // timing and only the routing test has to talk about routing.
+    playAt: vi.fn(
+      (notes: number[], whenSec: number, durationSec: number, velocity?: number, voice?: string) => {
+        playAtCalls.push({
+          notes,
+          whenSec,
+          durationSec,
+          velocity,
+          ...(voice && voice !== 'chords' && { voice }),
+        });
+      },
+    ),
     stopAll: vi.fn(() => {
       stopAllCalls++;
     }),
     setEnabled: vi.fn(),
+    setVolume: vi.fn(),
     currentTime: 0,
   };
 }
@@ -58,12 +70,21 @@ function fakeMidiOut(available: boolean): MidiOut & { sendChordCalls: unknown[];
     },
     requestAccess: vi.fn(async (): Promise<MidiPort[]> => []),
     selectPort: vi.fn(),
-    sendChord: vi.fn((notes: number[], durationMs: number, velocity?: number, whenMs?: number) => {
-      sendChordCalls.push({ notes, durationMs, velocity, whenMs });
-    }),
+    sendChord: vi.fn(
+      (
+        notes: number[],
+        durationMs: number,
+        velocity?: number,
+        whenMs?: number,
+        channel?: number,
+      ) => {
+        sendChordCalls.push({ notes, durationMs, velocity, whenMs, ...(channel && { channel }) });
+      },
+    ),
     stopAll: vi.fn(() => {
       stopAllCalls++;
     }),
+    setVolume: vi.fn(),
     available,
   };
 }
@@ -162,7 +183,8 @@ describe('playProgression', () => {
       { notes: [64], whenSec: 0.5, durationSec: 0.425, velocity: 100 },
       { notes: [67], whenSec: 1, durationSec: 0.425, velocity: 100 },
       { notes: [60], whenSec: 1.5, durationSec: 0.425, velocity: 100 },
-      { notes: [72], whenSec: 1, durationSec: 0.5, velocity: 90 }, // melody, same timeline
+      // Melody: same timeline, its own voice.
+      { notes: [72], whenSec: 1, durationSec: 0.5, velocity: 90, voice: 'melody' },
     ]);
   });
 
@@ -184,7 +206,7 @@ describe('playProgression', () => {
     ticker.tick();
 
     expect(audio.playAtCalls).toEqual([
-      { notes: [72], whenSec: 0, durationSec: 0.5, velocity: 80 },
+      { notes: [72], whenSec: 0, durationSec: 0.5, velocity: 80, voice: 'melody' },
     ]);
   });
 

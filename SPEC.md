@@ -189,16 +189,23 @@ export function theoryPrior(key: Key, context: RelChord[]): Map<string, number>;
 ## `src/audio/`
 
 ```ts
+export type Voice = 'chords' | 'melody';   // independently mixable sources
+
 export interface AudioEngine {
   preload(): Promise<void>;              // fetch/decode samples; NO user gesture needed
   init(): Promise<void>;                 // preload() + the gesture-gated context resume()
-  playChord(notes: number[], durationSec?: number, velocity?: number): void;
-  playAt(notes: number[], whenSec: number, durationSec: number, velocity?: number): void;
+  playChord(notes: number[], durationSec?: number, velocity?: number, voice?: Voice): void;
+  playAt(notes: number[], whenSec: number, durationSec: number, velocity?: number, voice?: Voice): void;
   stopAll(): void;                       // silence sounding voices AND drop queued ones
   setEnabled(on: boolean): void;         // internal-piano bypass toggle
+  setVolume(voice: Voice, level: number): void;  // 0-1, per-voice output channel
   readonly currentTime: number;          // AudioContext.currentTime
 }
 ```
+One instrument per voice, sharing a single sample loader, so the second voice is an
+extra output channel rather than an extra download — that is what makes `setVolume` a
+true fader instead of a velocity change.
+
 Two-phase startup: decoding samples does not need a running AudioContext, so the
 multi-second download starts on mount (the UI gates interaction until it resolves)
 and only `resume()` waits for a user gesture. `stopAll` must also clear the
@@ -227,14 +234,18 @@ export interface MidiOut {
   // Web MIDI's own timestamped send() so a shared audio+MIDI scheduler (see
   // `src/audio/playback.ts`) can schedule both sinks precisely from one
   // timeline. Omitted, notes send as soon as possible.
-  sendChord(notes: number[], durationMs: number, velocity?: number, whenMs?: number): void;
-  stopAll(): void;                       // MIDI panic: silence the selected output now
+  sendChord(notes: number[], durationMs: number, velocity?: number, whenMs?: number,
+            channel?: number): void;     // see MIDI_CHANNEL
+  setVolume(channel: number, level: number): void;  // 0-1, sent as CC 7
+  stopAll(): void;                       // MIDI panic on EVERY channel the app uses
   readonly available: boolean;
 }
+export const MIDI_CHANNEL = { chords: 0, melody: 1 } as const;  // zero-based
 export function exportMidiFile(
   bars: (AbsChord|null)[], bpm: number,
   opts?: { style?: BarStyle; melody?: (NoteEvent[] | null)[] },   // defaults to whole-bar chords
-): Blob; // SMF format 0
+): Blob; // format 0 for chords alone; format 1 (tempo + chord + melody tracks,
+         // on MIDI_CHANNEL.chords / .melody) once a melody is present
 ```
 App must stay fully usable when MIDI access is denied.
 

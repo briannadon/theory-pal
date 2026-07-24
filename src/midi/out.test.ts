@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { WebMidiOut } from './out.ts';
+import { MIDI_CHANNEL, WebMidiOut } from './out.ts';
 
 interface FakeOutput {
   id: string;
@@ -128,6 +128,55 @@ describe('WebMidiOut', () => {
     expect(out.clear).toHaveBeenCalledTimes(1);
     expect(out.send).toHaveBeenCalledWith([0xb0, 120, 0]);
     expect(out.send).toHaveBeenCalledWith([0xb0, 123, 0]);
+  });
+
+  it('sends each part on its own channel', async () => {
+    const out = makeFakeOutput('a');
+    const midi = new WebMidiOut({ requestMIDIAccessFn: vi.fn(async () => fakeAccess([out])) });
+    await midi.requestAccess();
+    midi.selectPort('a');
+
+    midi.sendChord([60], 100, 90, 1000); // default: chords
+    midi.sendChord([72], 100, 90, 1000, MIDI_CHANNEL.melody);
+
+    expect(out.send).toHaveBeenCalledWith([0x90, 60, 90], 1000); // channel 1
+    expect(out.send).toHaveBeenCalledWith([0x91, 72, 90], 1000); // channel 2
+    expect(out.send).toHaveBeenCalledWith([0x80, 60, 0], 1100);
+    expect(out.send).toHaveBeenCalledWith([0x81, 72, 0], 1100);
+  });
+
+  it('setVolume sends channel volume (CC 7), scaled and clamped', async () => {
+    const out = makeFakeOutput('a');
+    const midi = new WebMidiOut({ requestMIDIAccessFn: vi.fn(async () => fakeAccess([out])) });
+    await midi.requestAccess();
+    midi.selectPort('a');
+
+    midi.setVolume(MIDI_CHANNEL.chords, 1);
+    midi.setVolume(MIDI_CHANNEL.melody, 0.5);
+    midi.setVolume(MIDI_CHANNEL.melody, 4);
+
+    expect(out.send).toHaveBeenCalledWith([0xb0, 7, 127]);
+    expect(out.send).toHaveBeenCalledWith([0xb1, 7, 64]);
+    expect(out.send).toHaveBeenCalledWith([0xb1, 7, 127]);
+  });
+
+  it('stopAll panics every channel the app sends on', async () => {
+    const out = makeFakeOutput('a');
+    const midi = new WebMidiOut({ requestMIDIAccessFn: vi.fn(async () => fakeAccess([out])) });
+    await midi.requestAccess();
+    midi.selectPort('a');
+
+    midi.stopAll();
+
+    // A lead note left hanging on the melody channel is exactly what Stop
+    // has to clear.
+    expect(out.send).toHaveBeenCalledWith([0xb1, 120, 0]);
+    expect(out.send).toHaveBeenCalledWith([0xb1, 123, 0]);
+  });
+
+  it('setVolume no-ops with no port selected', () => {
+    const midi = new WebMidiOut({ requestMIDIAccessFn: vi.fn() });
+    expect(() => midi.setVolume(MIDI_CHANNEL.melody, 0.5)).not.toThrow();
   });
 
   it('stopAll tolerates an output with no clear() method', async () => {

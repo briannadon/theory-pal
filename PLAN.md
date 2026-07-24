@@ -188,6 +188,9 @@ end-to-end before running the full corpus.
     Essen's average 13.6-semitone span so they stay singable. Citations are in the
     header comment of generate.ts.
 
+  - Parts: chords and melody are separate voices with independent levels, separate
+    live MIDI channels, and separate tracks in a format-1 `.mid` export.
+
   Remaining: 11ths/13ths (same `ChordMods` mechanism); suggestion blend tuning;
   per-slot arp overrides; progression save/share (URL-encoded state is enough, still
   no backend). A corpus-trained melody model would need a second data pipeline

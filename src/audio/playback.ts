@@ -20,8 +20,8 @@ import {
   type NoteEvent,
   type VoicedChord,
 } from '../theory/index.ts';
-import type { MidiOut } from '../midi/index.ts';
-import type { AudioEngine } from './engine.ts';
+import { MIDI_CHANNEL, type MidiOut } from '../midi/index.ts';
+import type { AudioEngine, Voice } from './engine.ts';
 import { StepScheduler, realTimeTicker, type Clock, type Ticker } from './scheduler.ts';
 
 export interface PlayProgressionOptions {
@@ -102,20 +102,36 @@ export function playProgression(opts: PlayProgressionOptions): Playback {
       // NoteEvents, so both sinks schedule from identical material and a new
       // style never needs a second scheduling path.
       const chord = opts.chords[index];
-      const events: NoteEvent[] = [];
+      const sources: { events: NoteEvent[]; voice: Voice; channel: number }[] = [];
       if (chord && chord.notes.length > 0) {
-        events.push(...renderBar(chord, style, beatsPerBar, opts.rng));
+        sources.push({
+          events: renderBar(chord, style, beatsPerBar, opts.rng),
+          voice: 'chords',
+          channel: MIDI_CHANNEL.chords,
+        });
       }
       const melodyBar = opts.melody?.[index];
-      if (melodyBar) events.push(...melodyBar);
-      if (events.length === 0) return;
+      if (melodyBar && melodyBar.length > 0) {
+        sources.push({ events: melodyBar, voice: 'melody', channel: MIDI_CHANNEL.melody });
+      }
 
-      for (const ev of events) {
-        const startSec = time + ev.startBeat * beatDurationSec;
-        const durationSec = ev.durationBeats * beatDurationSec;
-        audio?.playAt([ev.note], startSec, durationSec, ev.velocity);
-        if (midi?.available && midiOffsetMs !== null) {
-          midi.sendChord([ev.note], durationSec * 1000, ev.velocity, midiOffsetMs + startSec * 1000);
+      // Both sources are scheduled from this one step's `time`, so the lead
+      // cannot drift against the accompaniment, but each keeps its own audio
+      // voice and MIDI channel so they stay separately mixable and routable.
+      for (const { events, voice, channel } of sources) {
+        for (const ev of events) {
+          const startSec = time + ev.startBeat * beatDurationSec;
+          const durationSec = ev.durationBeats * beatDurationSec;
+          audio?.playAt([ev.note], startSec, durationSec, ev.velocity, voice);
+          if (midi?.available && midiOffsetMs !== null) {
+            midi.sendChord(
+              [ev.note],
+              durationSec * 1000,
+              ev.velocity,
+              midiOffsetMs + startSec * 1000,
+              channel,
+            );
+          }
         }
       }
     },

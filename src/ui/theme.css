@@ -593,20 +593,30 @@
   box-shadow: inset 0 0 0 9999px rgba(255, 255, 255, 0.02);
 }
 
-/* Hovering a bar resolves the whole lane to that one chord: its tones lift,
-   everything else recedes. Applied as an overlay so the per-bar tinting
-   underneath stays visible rather than being replaced. */
+/* Hovering a bar resolves the whole lane to that one chord, in three tiers:
+   its own tones in the chord accent, the key's other scale tones in grey
+   behind them, everything off-scale pushed back. Applied as an overlay so the
+   per-bar tinting underneath stays visible rather than being replaced. */
 .tp-lane__row--lit {
-  box-shadow: inset 0 0 0 9999px rgba(82, 230, 193, 0.16);
+  box-shadow: inset 0 0 0 9999px rgba(82, 230, 193, 0.18);
+}
+
+.tp-lane__row--scale {
+  box-shadow: inset 0 0 0 9999px rgba(180, 186, 205, 0.09);
 }
 
 .tp-lane__row--dim {
-  box-shadow: inset 0 0 0 9999px rgba(10, 11, 15, 0.55);
+  box-shadow: inset 0 0 0 9999px rgba(10, 11, 15, 0.6);
 }
 
 .tp-lane__key--lit {
   color: var(--accent-diatonic);
   background: rgba(82, 230, 193, 0.1);
+}
+
+.tp-lane__key--scale {
+  color: var(--ink-dim);
+  background: rgba(180, 186, 205, 0.06);
 }
 
 .tp-lane__key--dim {
@@ -644,6 +654,18 @@
 .tp-lane__note--active {
   background: var(--accent-surprise);
   cursor: grabbing;
+}
+
+/* Alt-drag erase marquee: anything it touches goes on release. */
+.tp-lane__surface--erasing {
+  cursor: alias;
+}
+
+.tp-lane__erase-box {
+  position: absolute;
+  border: 1px solid var(--accent-danger);
+  background: rgba(255, 107, 107, 0.16);
+  pointer-events: none;
 }
 
 .tp-lane__slider {
@@ -891,6 +913,28 @@
   color: var(--accent-diatonic);
   border-color: color-mix(in srgb, var(--accent-diatonic) 45%, var(--line));
   background: var(--accent-diatonic-bg);
+}
+
+.tp-transport__mixer {
+  gap: 14px;
+}
+
+.tp-transport__mixer label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tp-transport__mixer input[type='range'] {
+  width: 74px;
+  accent-color: var(--accent-diatonic);
+}
+
+.tp-mixer__label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-faint);
 }
 
 .tp-transport__spacer {

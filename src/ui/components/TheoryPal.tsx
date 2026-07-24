@@ -12,7 +12,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { playProgression, type Playback } from '../../audio/index.ts';
-import { exportMidiFile } from '../../midi/index.ts';
+import { exportMidiFile, MIDI_CHANNEL } from '../../midi/index.ts';
 import { suggest, surprise, type Suggestion } from '../../model/index.ts';
 import {
   clampMelody,
@@ -66,6 +66,10 @@ export function TheoryPal() {
   const [melody, setMelody] = useState<MelodyLane>(() => emptyMelody(8));
   const [melodySurprise, setMelodySurprise] = useState<number>(0.25);
   const [hoveredBar, setHoveredBar] = useState<number | null>(null);
+  const [volumes, setVolumes] = useState<{ chords: number; melody: number }>({
+    chords: 0.85,
+    melody: 1,
+  });
 
   const playbackRef = useRef<Playback | null>(null);
 
@@ -95,6 +99,18 @@ export function TheoryPal() {
   useEffect(() => {
     setMelody((m) => clampMelody(m, grid.size));
   }, [grid.size]);
+
+  // Mixer levels reach both sinks: the piano's per-voice output channels and,
+  // for MIDI, channel volume (CC 7) on each channel — the standard meaning of
+  // a fader for a receiving instrument.
+  useEffect(() => {
+    engine.setVolume('chords', volumes.chords);
+    engine.setVolume('melody', volumes.melody);
+    if (midi.available) {
+      midi.setVolume(MIDI_CHANNEL.chords, volumes.chords);
+      midi.setVolume(MIDI_CHANNEL.melody, volumes.melody);
+    }
+  }, [engine, midi, volumes]);
 
   // Keep piano toggle in sync with engine
   useEffect(() => {
@@ -141,8 +157,9 @@ export function TheoryPal() {
       void ensureInit();
       const note = melodyPitchToMidi(pitch, key);
       const quarterNoteSec = 60 / bpm;
-      if (isPianoEnabled) engine.playChord([note], quarterNoteSec);
-      if (midi.available) midi.sendChord([note], quarterNoteSec * 1000);
+      if (isPianoEnabled) engine.playChord([note], quarterNoteSec, undefined, 'melody');
+      if (midi.available)
+        midi.sendChord([note], quarterNoteSec * 1000, undefined, undefined, MIDI_CHANNEL.melody);
     },
     [ensureInit, key, bpm, isPianoEnabled, engine, midi],
   );
@@ -316,6 +333,9 @@ export function TheoryPal() {
           onTogglePiano={() => setIsPianoEnabled((p) => !p)}
           style={style}
           onStyleChange={setStyle}
+          chordVolume={volumes.chords}
+          melodyVolume={volumes.melody}
+          onVolumeChange={(voice, level) => setVolumes((v) => ({ ...v, [voice]: level }))}
           midiStatus={midiStatus}
           midiPorts={midiPorts}
           selectedMidiPortId={selectedPortId}

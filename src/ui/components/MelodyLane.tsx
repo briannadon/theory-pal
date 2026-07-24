@@ -5,9 +5,16 @@
 // as the harmony moves.
 //
 // Hovering a bar (here, or its tile in the grid above) resolves the lane to
-// that one chord: its tones light up across the full width and everything else
-// recedes, answering "what can I play over this chord?" in one glance instead
-// of asking the eye to scan a single column.
+// that one chord: its tones light up in the chord accent, the key's other
+// scale tones sit behind them in grey, and everything off-scale recedes —
+// answering "what can I play over this chord?" in one glance instead of asking
+// the eye to scan a single column.
+//
+// Gestures: drag on empty space draws a note as long as the drag; drag a note
+// to move it, or its right edge to lengthen it. Deleting is deliberately
+// modified — hold Alt and click a note, or Alt-drag a box over several —
+// because an unmodified click that destroys work is too easy to fire by
+// accident while sketching.
 //
 // Rendering: rows are absolutely-positioned bands whose background is a single
 // left-to-right gradient with one stop per bar, rather than one element per
@@ -45,7 +52,17 @@ const ROW_H = 13;
 const STEP_W = { 8: 18, 16: 11 } as const;
 const RESIZE_GRIP_PX = 6;
 
-type DragMode = { kind: 'move'; index: number } | { kind: 'resize'; index: number } | null;
+interface Cell {
+  step: number;
+  pitch: number;
+}
+
+type Drag =
+  | { kind: 'draw'; index: number; anchor: number }
+  | { kind: 'move'; index: number; grabOffset: number }
+  | { kind: 'resize'; index: number }
+  | { kind: 'erase'; from: Cell; to: Cell }
+  | null;
 
 export function MelodyLane({
   lane,
@@ -58,8 +75,7 @@ export function MelodyLane({
   onAuditionPitch,
 }: MelodyLaneProps) {
   const surfaceRef = useRef<HTMLDivElement>(null);
-  const [drag, setDrag] = useState<DragMode>(null);
-  const movedRef = useRef(false);
+  const [drag, setDrag] = useState<Drag>(null);
 
   const stepW = STEP_W[lane.stepsPerBar];
   const totalSteps = slots.length * lane.stepsPerBar;
@@ -68,17 +84,25 @@ export function MelodyLane({
 
   // Rows run high pitch at the top, so row 0 is the top of the lane.
   const pitchForRow = (row: number) => MELODY_ROWS - 1 - row;
+  const rowForPitch = (pitch: number) => MELODY_ROWS - 1 - pitch;
 
   const hoveredChord = hoveredBar !== null ? (slots[hoveredBar] ?? null) : null;
-  const rowFocus = (pitch: number): '' | ' tp-lane__row--lit' | ' tp-lane__row--dim' => {
+  /** Which of the three hover tiers a row is in — chord tone, other scale
+   * tone, or off-scale — as a class-name suffix shared by the lane rows and
+   * the gutter keys, which use the same tiers under different block names. */
+  const focusTier = (pitch: number): '' | 'lit' | 'scale' | 'dim' => {
     if (hoveredBar === null) return '';
-    return melodyRowKind(pitch, hoveredChord, keyValue) === 'chord'
-      ? ' tp-lane__row--lit'
-      : ' tp-lane__row--dim';
+    const kind = melodyRowKind(pitch, hoveredChord, keyValue);
+    if (kind === 'chord') return 'lit';
+    return kind === 'scale' ? 'scale' : 'dim';
+  };
+  const focusClass = (block: 'row' | 'key', pitch: number): string => {
+    const tier = focusTier(pitch);
+    return tier ? ` tp-lane__${block}--${tier}` : '';
   };
 
   const pointToCell = useCallback(
-    (clientX: number, clientY: number) => {
+    (clientX: number, clientY: number): Cell | null => {
       const rect = surfaceRef.current?.getBoundingClientRect();
       if (!rect) return null;
       const step = Math.floor((clientX - rect.left) / stepW);
@@ -89,23 +113,47 @@ export function MelodyLane({
     [stepW, totalSteps],
   );
 
+  const capture = (e: React.PointerEvent) => {
+    surfaceRef.current?.setPointerCapture(e.pointerId);
+  };
+
   const handleSurfacePointerDown = (e: React.PointerEvent) => {
     if (drag) return;
     const cell = pointToCell(e.clientX, e.clientY);
     if (!cell) return;
+    capture(e);
+
+    if (e.altKey) {
+      // Alt-press starts an erase box. A press with no movement is a
+      // one-cell box, which is how Alt-click deletes a single note.
+      setDrag({ kind: 'erase', from: cell, to: cell });
+      return;
+    }
+
     const note: MelodyNote = { pitch: cell.pitch, start: cell.step, length: 1 };
-    onChange(addMelodyNote(lane, note)); // monophonic: trims whatever it lands on
+    const next = addMelodyNote(lane, note); // monophonic: trims whatever it lands on
+    onChange(next);
+    // Keep dragging to set the note's length, rather than always writing the
+    // shortest possible note and making the user resize it afterwards.
+    setDrag({ kind: 'draw', index: next.notes.indexOf(note), anchor: cell.step });
     onAuditionPitch(cell.pitch);
   };
 
   const handleNotePointerDown = (e: React.PointerEvent, index: number, note: MelodyNote) => {
+    // Alt is the erase modifier everywhere, so let it fall through to the
+    // surface handler and start a box there instead of grabbing the note.
+    if (e.altKey) return;
     e.stopPropagation();
+    capture(e);
     const rect = (e.target as HTMLElement).getBoundingClientRect();
     const onGrip = e.clientX >= rect.right - RESIZE_GRIP_PX;
-    movedRef.current = false;
-    setDrag({ kind: onGrip ? 'resize' : 'move', index });
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    if (!onGrip) onAuditionPitch(note.pitch);
+    if (onGrip) {
+      setDrag({ kind: 'resize', index });
+      return;
+    }
+    const cell = pointToCell(e.clientX, e.clientY);
+    setDrag({ kind: 'move', index, grabOffset: cell ? cell.step - note.start : 0 });
+    onAuditionPitch(note.pitch);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
@@ -115,34 +163,53 @@ export function MelodyLane({
       onHoverBar(cell ? Math.floor(cell.step / lane.stepsPerBar) : null);
       return;
     }
+    if (drag.kind === 'erase') {
+      if (cell && (cell.step !== drag.to.step || cell.pitch !== drag.to.pitch)) {
+        setDrag({ ...drag, to: cell });
+      }
+      return;
+    }
     if (!cell) return;
+
     const current = lane.notes[drag.index];
     if (!current) return;
+    const notes = lane.notes.slice();
 
     if (drag.kind === 'move') {
-      if (cell.step === current.start && cell.pitch === current.pitch) return;
-      movedRef.current = true;
-      const notes = lane.notes.slice();
-      notes[drag.index] = { ...current, start: cell.step, pitch: cell.pitch };
-      onChange({ ...lane, notes });
+      const start = Math.max(0, Math.min(totalSteps - current.length, cell.step - drag.grabOffset));
+      if (start === current.start && cell.pitch === current.pitch) return;
+      notes[drag.index] = { ...current, start, pitch: cell.pitch };
     } else {
-      const length = Math.max(1, cell.step - current.start + 1);
+      // draw and resize are the same operation from different anchors.
+      const anchor = drag.kind === 'draw' ? drag.anchor : current.start;
+      const length = Math.max(1, Math.min(totalSteps - anchor, cell.step - anchor + 1));
       if (length === current.length) return;
-      movedRef.current = true;
-      const notes = lane.notes.slice();
       notes[drag.index] = { ...current, length };
-      onChange({ ...lane, notes });
     }
+    onChange({ ...lane, notes });
   };
 
-  // A press-and-release on a note without moving it deletes it — the lane's
-  // only destructive gesture, and the inverse of click-empty-space-to-add.
   const handlePointerUp = () => {
-    if (drag && !movedRef.current) {
-      onChange({ ...lane, notes: lane.notes.filter((_, i) => i !== drag.index) });
+    if (drag?.kind === 'erase') {
+      const lowStep = Math.min(drag.from.step, drag.to.step);
+      const highStep = Math.max(drag.from.step, drag.to.step);
+      const lowPitch = Math.min(drag.from.pitch, drag.to.pitch);
+      const highPitch = Math.max(drag.from.pitch, drag.to.pitch);
+      // Any note the box touches goes, not just ones wholly inside it.
+      onChange({
+        ...lane,
+        notes: lane.notes.filter(
+          (n) =>
+            !(
+              n.pitch >= lowPitch &&
+              n.pitch <= highPitch &&
+              n.start <= highStep &&
+              n.start + n.length - 1 >= lowStep
+            ),
+        ),
+      });
     }
     setDrag(null);
-    movedRef.current = false;
   };
 
   /** One row's background: a stop per bar, colored by that bar's chord. */
@@ -168,6 +235,16 @@ export function MelodyLane({
     return `${noteName(midi % 12, 'maj')}${Math.floor(midi / 12) - 1}`;
   };
 
+  const eraseBox =
+    drag?.kind === 'erase'
+      ? {
+          left: Math.min(drag.from.step, drag.to.step) * stepW,
+          width: (Math.abs(drag.to.step - drag.from.step) + 1) * stepW,
+          top: rowForPitch(Math.max(drag.from.pitch, drag.to.pitch)) * ROW_H,
+          height: (Math.abs(drag.to.pitch - drag.from.pitch) + 1) * ROW_H,
+        }
+      : null;
+
   return (
     <div className="tp-lane" onPointerLeave={() => onHoverBar(null)}>
       <div className="tp-lane__gutter" style={{ height }}>
@@ -177,7 +254,7 @@ export function MelodyLane({
             <button
               key={row}
               type="button"
-              className={`tp-lane__key${pitch % 12 === 0 ? ' tp-lane__key--tonic' : ''}${rowFocus(pitch)}`}
+              className={`tp-lane__key${pitch % 12 === 0 ? ' tp-lane__key--tonic' : ''}${focusClass('key', pitch)}`}
               style={{ height: ROW_H }}
               onClick={() => onAuditionPitch(pitch)}
               tabIndex={-1}
@@ -191,19 +268,20 @@ export function MelodyLane({
 
       <div className="tp-lane__scroll">
         <div
-          className="tp-lane__surface"
+          className={`tp-lane__surface${drag?.kind === 'erase' ? ' tp-lane__surface--erasing' : ''}`}
           ref={surfaceRef}
           style={{ width, height }}
           onPointerDown={handleSurfacePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
         >
           {Array.from({ length: MELODY_ROWS }, (_, row) => {
             const pitch = pitchForRow(row);
             return (
               <div
                 key={row}
-                className={`tp-lane__row${pitch % 12 === 0 ? ' tp-lane__row--tonic' : ''}${rowFocus(pitch)}`}
+                className={`tp-lane__row${pitch % 12 === 0 ? ' tp-lane__row--tonic' : ''}${focusClass('row', pitch)}`}
                 style={{ top: row * ROW_H, height: ROW_H, background: rowGradient(pitch) }}
               />
             );
@@ -222,17 +300,19 @@ export function MelodyLane({
           {lane.notes.map((note, i) => (
             <div
               key={`${note.start}-${note.pitch}-${i}`}
-              className={`tp-lane__note${drag?.index === i ? ' tp-lane__note--active' : ''}`}
+              className={`tp-lane__note${drag && 'index' in drag && drag.index === i ? ' tp-lane__note--active' : ''}`}
               style={{
                 left: note.start * stepW,
                 width: Math.max(1, note.length) * stepW - 1,
-                top: (MELODY_ROWS - 1 - note.pitch) * ROW_H,
+                top: rowForPitch(note.pitch) * ROW_H,
                 height: ROW_H - 1,
               }}
               onPointerDown={(e) => handleNotePointerDown(e, i, note)}
-              title={`${rowLabel(note.pitch)} · drag to move, drag the right edge to lengthen, click to delete`}
+              title={`${rowLabel(note.pitch)} · drag to move, drag the right edge to lengthen, alt-click to delete`}
             />
           ))}
+
+          {eraseBox && <div className="tp-lane__erase-box" style={eraseBox} />}
         </div>
       </div>
     </div>
