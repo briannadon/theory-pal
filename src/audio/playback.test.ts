@@ -34,6 +34,7 @@ function fakeAudioEngine(): AudioEngine & { playAtCalls: unknown[]; stopAllCalls
     get stopAllCalls() {
       return stopAllCalls;
     },
+    preload: vi.fn(async () => {}),
     init: vi.fn(async () => {}),
     playChord: vi.fn(),
     playAt: vi.fn((notes: number[], whenSec: number, durationSec: number, velocity?: number) => {

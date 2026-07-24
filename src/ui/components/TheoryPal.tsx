@@ -34,6 +34,7 @@ import { DiatonicStrip } from './DiatonicStrip.tsx';
 import { GridContainer } from './GridContainer.tsx';
 import { KeyPicker } from './KeyPicker.tsx';
 import { ModelBadge } from './ModelBadge.tsx';
+import { SoundOverlay } from './SoundOverlay.tsx';
 import { SuggestionStrip } from './SuggestionStrip.tsx';
 import { Transport } from './Transport.tsx';
 
@@ -50,7 +51,7 @@ export function TheoryPal() {
 
   const playbackRef = useRef<Playback | null>(null);
 
-  const { engine, ensureInit } = useAudioEngine();
+  const { engine, ensureInit, soundStatus } = useAudioEngine();
   const {
     midi,
     status: midiStatus,
@@ -207,17 +208,21 @@ export function TheoryPal() {
     URL.revokeObjectURL(url);
   }, [grid.slots, key, bpm]);
 
+  // Picking a quality by hand replaces the chord outright, dropping any
+  // modifiers it arrived with: the dropdown lists base qualities, so keeping
+  // e.g. a sus4 mod would silently contradict the quality just chosen.
   const handleModifyQualitySlot = useCallback((index: number, quality: ChordQuality) => {
     setGrid((g) => {
       const existing = g.slots[index];
       if (!existing) return g;
-      return setSlot(g, index, { ...existing, quality });
+      return setSlot(g, index, { degree: existing.degree, quality });
     });
   }, []);
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="tp-app">
+        <SoundOverlay status={soundStatus} />
         <header className="tp-header">
           <h1 className="tp-header__brand">
             theory<span className="tp-header__brand-mark">•</span>pal

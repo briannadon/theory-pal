@@ -23,6 +23,7 @@ interface FakeInstrument {
   ready: Promise<void>;
   start: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
+  scheduler: { schedule: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn> };
 }
 
 function makeFakeInstrument(): FakeInstrument {
@@ -31,6 +32,7 @@ function makeFakeInstrument(): FakeInstrument {
     ready: Promise.resolve(),
     start: vi.fn(() => noopStop),
     stop: vi.fn(),
+    scheduler: { schedule: vi.fn(() => noopStop), stop: vi.fn() },
   };
 }
 
@@ -57,6 +59,37 @@ describe('SmplrAudioEngine', () => {
     expect(contextFactory).toHaveBeenCalledTimes(1);
     expect(instrumentFactory).toHaveBeenCalledTimes(1);
     expect(ctx.resume).toHaveBeenCalledTimes(1);
+  });
+
+  it('preload() loads samples without resuming the context (no gesture required)', async () => {
+    const ctx = makeFakeContext();
+    const instrument = makeFakeInstrument();
+    const instrumentFactory = vi.fn(() => instrument as unknown as Smplr);
+    const engine = new SmplrAudioEngine({
+      contextFactory: () => ctx as unknown as AudioContext,
+      instrumentFactory,
+    });
+
+    await engine.preload();
+
+    expect(instrumentFactory).toHaveBeenCalledTimes(1);
+    expect(ctx.resume).not.toHaveBeenCalled();
+    expect(ctx.state).toBe('suspended');
+  });
+
+  it('init() after preload() resumes without re-fetching the samples', async () => {
+    const ctx = makeFakeContext();
+    const contextFactory = vi.fn(() => ctx as unknown as AudioContext);
+    const instrumentFactory = vi.fn(() => makeFakeInstrument() as unknown as Smplr);
+    const engine = new SmplrAudioEngine({ contextFactory, instrumentFactory });
+
+    await engine.preload();
+    await engine.init();
+    await engine.init();
+
+    expect(contextFactory).toHaveBeenCalledTimes(1);
+    expect(instrumentFactory).toHaveBeenCalledTimes(1);
+    expect(ctx.resume).toHaveBeenCalledTimes(1); // only the first init(): already running after that
   });
 
   it('currentTime reflects the context, and is 0 before init()', async () => {
@@ -141,5 +174,21 @@ describe('SmplrAudioEngine', () => {
 
     engine.playChord([60]);
     expect(instrument.start).toHaveBeenCalledTimes(1); // still usable afterwards
+  });
+
+  it('stopAll() also drops notes scheduled for the future, not just sounding ones', async () => {
+    const instrument = makeFakeInstrument();
+    const engine = new SmplrAudioEngine({
+      contextFactory: () => makeFakeContext() as unknown as AudioContext,
+      instrumentFactory: () => instrument as unknown as Smplr,
+    });
+    await engine.init();
+
+    engine.playAt([60], 4, 0.5); // queued well beyond smplr's own lookahead
+    engine.stopAll();
+
+    // `instrument.stop()` alone only releases started voices — without this,
+    // a stop mid-bar lets the rest of the bar's scheduled notes still fire.
+    expect(instrument.scheduler.stop).toHaveBeenCalledTimes(1);
   });
 });

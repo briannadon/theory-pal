@@ -1,15 +1,17 @@
 // SoundFont piano playback (SPEC.md `src/audio/`). Built on `smplr`'s
 // `SplendidGrandPiano` — a sampled Steinway grand shipped by smplr itself and
-// fetched lazily from smplr's own sample host at instrument-creation time, so
-// there is nothing to vendor into `public/`: no asset load happens until
-// `init()` runs, and no `AudioContext` is constructed at module import time
-// (browsers refuse to start one before a user gesture anyway).
+// fetched from smplr's own sample host at instrument-creation time, so there
+// is nothing to vendor into `public/`. Nothing happens at module import time;
+// loading starts when the app calls `preload()` (samples only — no user
+// gesture needed) or `init()` (samples plus the gesture-gated context
+// resume browsers require before audio can actually sound).
 //
 // `contextFactory` / `instrumentFactory` are injectable so this class is
 // unit-testable without a real browser AudioContext (see engine.test.ts).
 import { SplendidGrandPiano, type Smplr } from 'smplr';
 
 export interface AudioEngine {
+  preload(): Promise<void>;
   init(): Promise<void>;
   playChord(notes: number[], durationSec?: number, velocity?: number): void;
   playAt(notes: number[], whenSec: number, durationSec: number, velocity?: number): void;
@@ -37,30 +39,41 @@ export class SmplrAudioEngine implements AudioEngine {
   private context: AudioContext | null = null;
   private instrument: Smplr | null = null;
   private enabled = true;
-  private initPromise: Promise<void> | null = null;
+  private loadPromise: Promise<void> | null = null;
 
   constructor(options?: AudioEngineOptions) {
     this.contextFactory = options?.contextFactory ?? (() => new AudioContext());
     this.instrumentFactory = options?.instrumentFactory ?? ((ctx) => SplendidGrandPiano(ctx));
   }
 
-  /** Idempotent: safe to call from multiple gesture handlers; every caller
-   * awaits the same underlying load. Must be called from a user-gesture
-   * handler — never on module import or page load. */
-  init(): Promise<void> {
-    if (!this.initPromise) {
-      this.initPromise = (async () => {
+  /** Fetch and decode the soundfont without requiring a user gesture. The
+   * AudioContext is constructed here but deliberately left however the
+   * browser hands it over (suspended, under autoplay policy) — decoding
+   * samples doesn't need a running context, so the multi-second download can
+   * overlap with the user reading the page instead of stalling their first
+   * click. Idempotent; every caller awaits the same load. */
+  preload(): Promise<void> {
+    if (!this.loadPromise) {
+      this.loadPromise = (async () => {
         const ctx = this.contextFactory();
         this.context = ctx;
-        if (ctx.state === 'suspended') {
-          await ctx.resume();
-        }
         const instrument = this.instrumentFactory(ctx);
         this.instrument = instrument;
         await instrument.ready;
       })();
     }
-    return this.initPromise;
+    return this.loadPromise;
+  }
+
+  /** Idempotent: safe to call from multiple gesture handlers; every caller
+   * awaits the same underlying load. The `resume()` half must run from a
+   * user-gesture handler — the `preload()` half need not, and normally has
+   * already finished by the time the first gesture arrives. */
+  async init(): Promise<void> {
+    await this.preload();
+    if (this.context?.state === 'suspended') {
+      await this.context.resume();
+    }
   }
 
   get currentTime(): number {
@@ -83,10 +96,17 @@ export class SmplrAudioEngine implements AudioEngine {
     }
   }
 
-  /** Silence anything currently sounding. Does not tear down the engine —
-   * `init()` need not be called again afterwards. */
+  /** Silence anything currently sounding *and* drop anything already
+   * scheduled. Both halves matter: `playAt` hands smplr note events up to a
+   * bar ahead of the audible present, and smplr's `stop()` only releases
+   * voices that have started — queued events would keep firing, so a stop
+   * mid-bar would play the rest of that bar out. `scheduler.stop()` clears
+   * that queue; it restarts itself on the next scheduled note, so this stays
+   * non-destructive: `init()` need not be called again afterwards. */
   stopAll(): void {
-    this.instrument?.stop();
+    if (!this.instrument) return;
+    this.instrument.scheduler.stop();
+    this.instrument.stop();
   }
 
   /** Internal-piano bypass toggle for users routing MIDI out instead. Muting
@@ -94,6 +114,6 @@ export class SmplrAudioEngine implements AudioEngine {
    * re-enabling resumes normal playback with no re-init needed. */
   setEnabled(on: boolean): void {
     this.enabled = on;
-    if (!on) this.instrument?.stop();
+    if (!on) this.stopAll();
   }
 }
