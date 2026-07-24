@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  chordIntervals,
   chordPitches,
+  chordShape,
   diatonicChords,
   isDiatonic,
   parseStateKey,
@@ -187,5 +189,59 @@ describe('isDiatonic', () => {
 
   it('sus chords are never diatonic', () => {
     expect(isDiatonic({ degree: 0, quality: 'sus4' }, cMajor)).toBe(false);
+  });
+});
+
+describe('chord modifiers', () => {
+  const cMajorKey: Key = { tonic: 0, scale: 'ionian' };
+
+  it('leaves unmodified chords exactly as the quality table defines them', () => {
+    for (const q of Object.keys(QUALITY_INTERVALS) as ChordQuality[]) {
+      expect(chordIntervals(q)).toEqual(QUALITY_INTERVALS[q]);
+      expect(chordIntervals(q, {})).toEqual(QUALITY_INTERVALS[q]);
+    }
+  });
+
+  it('sus replaces the third but keeps the fifth and any seventh', () => {
+    expect(chordIntervals('maj', { sus: 4 })).toEqual([0, 5, 7]);
+    expect(chordIntervals('min', { sus: 2 })).toEqual([0, 2, 7]);
+    expect(chordIntervals('dom7', { sus: 4 })).toEqual(QUALITY_INTERVALS.dom7sus4);
+    expect(chordIntervals('maj7', { sus: 4 })).toEqual([0, 5, 7, 11]);
+    expect(chordIntervals('m7b5', { sus: 4 })).toEqual([0, 5, 6, 10]); // b5 survives
+  });
+
+  it('adds a 9th independently of the 7th', () => {
+    expect(chordIntervals('maj', { ninth: true })).toEqual([0, 4, 7, 14]); // add9
+    expect(chordIntervals('maj7', { ninth: true })).toEqual([0, 4, 7, 11, 14]); // maj9
+    expect(chordIntervals('dom7', { sus: 4, ninth: true })).toEqual([0, 5, 7, 10, 14]); // 9sus4
+  });
+
+  it('skips a 9th that sus2 already supplies (same pitch class)', () => {
+    expect(chordIntervals('maj', { sus: 2, ninth: true })).toEqual([0, 2, 7]);
+  });
+
+  it('modifiers reach the sounding pitches', () => {
+    expect(chordPitches({ root: 0, quality: 'maj7', mods: { ninth: true } })).toEqual([0, 4, 7, 11, 2]);
+  });
+
+  it('state keys ignore modifiers, so the model sees the plain chord', () => {
+    const plain = stateKey({ degree: 7, quality: 'dom7' });
+    expect(stateKey({ degree: 7, quality: 'dom7', mods: { sus: 4, ninth: true } })).toBe(plain);
+  });
+
+  it('toAbsolute/toRelative carry modifiers through', () => {
+    const rel = { degree: 7, quality: 'dom7' as ChordQuality, mods: { sus: 4 as const } };
+    const abs = toAbsolute(rel, cMajorKey);
+    expect(abs.mods).toEqual({ sus: 4 });
+    expect(toRelative(abs, cMajorKey)).toEqual(rel);
+  });
+
+  it('reports the shape a name renderer needs', () => {
+    expect(chordShape('dom7', { sus: 4, ninth: true })).toEqual({
+      third: 'sus4',
+      seventh: 'b7',
+      ninth: true,
+    });
+    expect(chordShape('min')).toEqual({ third: 'min', seventh: null, ninth: false });
   });
 });

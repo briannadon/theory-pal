@@ -61,3 +61,22 @@ describe('romanNumeral', () => {
     expect(romanNumeral(rc, cMajor)).toBe(romanNumeral(rc, otherKey));
   });
 });
+
+describe('romanNumeral with modifiers', () => {
+  it('absorbs a 9th into the numeral, keeping the degree’s case', () => {
+    expect(romanNumeral({ degree: 7, quality: 'dom7', mods: { ninth: true } }, cMajor)).toBe('V9');
+    expect(romanNumeral({ degree: 2, quality: 'min7', mods: { ninth: true } }, cMajor)).toBe('ii9');
+    expect(romanNumeral({ degree: 0, quality: 'maj7', mods: { ninth: true } }, cMajor)).toBe('Imaj9');
+  });
+
+  it('marks a 9th without a 7th as an added tone', () => {
+    expect(romanNumeral({ degree: 0, quality: 'maj', mods: { ninth: true } }, cMajor)).toBe('Iadd9');
+    expect(romanNumeral({ degree: 9, quality: 'min', mods: { ninth: true } }, cMajor)).toBe('viadd9');
+  });
+
+  it('renders sus modifiers, keeping the base quality’s case', () => {
+    expect(romanNumeral({ degree: 2, quality: 'min', mods: { sus: 4 } }, cMajor)).toBe('iisus4');
+    expect(romanNumeral({ degree: 7, quality: 'dom7', mods: { sus: 4 } }, cMajor)).toBe('V7sus4');
+    expect(romanNumeral({ degree: 7, quality: 'dom7', mods: { sus: 4, ninth: true } }, cMajor)).toBe('V9sus4');
+  });
+});

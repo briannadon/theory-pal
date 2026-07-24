@@ -4,7 +4,7 @@
 export type { ScaleId, Scale } from './scales.ts';
 export { getScale, allScales } from './scales.ts';
 
-export type { PitchClass, ChordQuality, Key, RelChord, AbsChord } from './chords.ts';
+export type { PitchClass, ChordQuality, ChordMods, ChordShape, Key, RelChord, AbsChord } from './chords.ts';
 export {
   QUALITY_INTERVALS,
   stateKey,
@@ -14,6 +14,8 @@ export {
   isDiatonic,
   diatonicChords,
   chordPitches,
+  chordIntervals,
+  chordShape,
 } from './chords.ts';
 
 export { noteName, chordName } from './pitch.ts';

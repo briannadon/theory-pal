@@ -6,7 +6,14 @@
 // not re-derived per mode). This makes the mapping key-independent and gives
 // every chromatic root exactly one canonical label — no ambiguity between e.g.
 // #IV and bV (this table picks #IV, matching common usage for the raised 4th).
-import { isMinorish, type ChordQuality, type Key, type RelChord } from './chords.ts';
+import {
+  chordShape,
+  isMinorish,
+  type ChordMods,
+  type ChordQuality,
+  type Key,
+  type RelChord,
+} from './chords.ts';
 
 const DEGREE_LABELS = [
   'I',
@@ -45,8 +52,41 @@ function mod12(n: number): number {
   return ((n % 12) + 12) % 12;
 }
 
+// Roman-numeral suffix for a *modified* chord (see ChordMods). Same shape
+// analysis the chord-symbol renderer uses, but with roman conventions: V7 + 9
+// is V9, ii7 + 9 is ii9, and the case of the numeral still comes from the base
+// quality even when a sus has displaced the third — keeping ii recognizable as
+// ii once it becomes iisus4.
+const NINTH_SUFFIX: Partial<Record<ChordQuality, string>> = {
+  maj7: 'maj9',
+  dom7: '9',
+  min7: '9',
+  m7b5: 'ø9',
+  dim7: 'o7add9',
+  minMaj7: 'maj9',
+  dom7sus4: '9sus4',
+};
+
+function moddedSuffix(quality: ChordQuality, mods: ChordMods): string {
+  const { third, seventh, ninth } = chordShape(quality, mods);
+
+  if (third === 'sus2' || third === 'sus4') {
+    const sus = third;
+    if (seventh && ninth) return `${seventh === 'maj7' ? 'maj9' : seventh === 'bb7' ? 'o9' : '9'}${sus}`;
+    if (seventh) return `${seventh === 'maj7' ? 'maj7' : seventh === 'bb7' ? 'o7' : '7'}${sus}`;
+    if (ninth) return `${sus}add9`;
+    return sus;
+  }
+
+  const base = QUALITY_SUFFIX[quality];
+  if (!ninth) return base;
+  if (!seventh) return `${base}add9`;
+  return NINTH_SUFFIX[quality] ?? `${base}add9`;
+}
+
 export function romanNumeral(c: RelChord, _key: Key): string {
   const label = DEGREE_LABELS[mod12(c.degree)];
   const cased = isMinorish(c.quality) ? label.toLowerCase() : label;
-  return `${cased}${QUALITY_SUFFIX[c.quality]}`;
+  const suffix = c.mods ? moddedSuffix(c.quality, c.mods) : QUALITY_SUFFIX[c.quality];
+  return `${cased}${suffix}`;
 }

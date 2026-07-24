@@ -12,7 +12,7 @@
 // and above the bass, lies closest to the nearest not-yet-claimed note of the
 // previous chord (greedy nearest-neighbor assignment) — this is what minimizes
 // total semitone movement between adjacent chords.
-import { QUALITY_INTERVALS, type AbsChord } from './chords.ts';
+import { chordIntervals, type AbsChord } from './chords.ts';
 
 export interface VoicedChord {
   notes: number[]; // MIDI note numbers, sorted ascending
@@ -60,7 +60,7 @@ export function voiceChord(c: AbsChord, prev?: VoicedChord, opts?: VoiceOpts): V
   const low = opts?.low ?? DEFAULT_LOW;
   const high = opts?.high ?? DEFAULT_HIGH;
 
-  const intervals = QUALITY_INTERVALS[c.quality];
+  const intervals = chordIntervals(c.quality, c.mods);
   const invIndex = ((c.inversion ?? 0) % intervals.length + intervals.length) % intervals.length;
   // Bass tone first, then the remaining tones in ascending chord order (wrapping) —
   // the standard "bass, then up through the rest" ordering for an inversion.

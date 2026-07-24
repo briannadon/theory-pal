@@ -1,5 +1,22 @@
+// The in-key chord row. Rather than picking one prebuilt family (triads /
+// 7ths / sus), the user stacks independent modifiers onto the key's diatonic
+// chords and the whole row re-renders: sus2 and sus4 are mutually exclusive
+// (both replace the third, so only one can win), while 7 and 9 are free.
+//
+// The 7 toggle is not a `ChordMods` field: "add the 7th" means *this degree's
+// diatonic 7th* — V gets a dom7, I a maj7 — which only the key knows, so it
+// selects the 7th-chord set from `diatonicChords` instead. sus and 9 are
+// key-independent alterations and ride along as mods.
 import { useState } from 'react';
-import { chordName, diatonicChords, romanNumeral, toAbsolute, type ChordQuality, type Key, type RelChord } from '../../theory/index.ts';
+import {
+  chordName,
+  diatonicChords,
+  romanNumeral,
+  toAbsolute,
+  type ChordMods,
+  type Key,
+  type RelChord,
+} from '../../theory/index.ts';
 import { StripCell } from './StripCell.tsx';
 
 export interface DiatonicStripProps {
@@ -7,52 +24,61 @@ export interface DiatonicStripProps {
   onAudition: (chord: RelChord) => void;
 }
 
-type Flavor = 'triads' | 'sevenths' | 'sus';
+type Sus = 2 | 4 | null;
 
 export function DiatonicStrip({ keyValue, onAudition }: DiatonicStripProps) {
-  const [flavor, setFlavor] = useState<Flavor>('triads');
+  const [sus, setSus] = useState<Sus>(null);
+  const [seventh, setSeventh] = useState(false);
+  const [ninth, setNinth] = useState(false);
 
-  let chords: RelChord[];
-  if (flavor === 'sevenths') {
-    chords = diatonicChords(keyValue, true);
-  } else if (flavor === 'sus') {
-    const triads = diatonicChords(keyValue, false);
-    chords = triads.map((rc, i) => {
-      if (i === 4) return { degree: rc.degree, quality: 'dom7sus4' as ChordQuality };
-      return { degree: rc.degree, quality: (i % 2 === 0 ? 'sus4' : 'sus2') as ChordQuality };
-    });
-  } else {
-    chords = diatonicChords(keyValue, false);
-  }
+  const mods: ChordMods | undefined =
+    sus === null && !ninth ? undefined : { ...(sus !== null && { sus }), ...(ninth && { ninth }) };
+
+  const chords: RelChord[] = diatonicChords(keyValue, seventh).map((rc) =>
+    mods ? { ...rc, mods } : rc,
+  );
+
+  // Clicking the active sus clears it; clicking the other one swaps.
+  const toggleSus = (value: 2 | 4) => setSus((cur) => (cur === value ? null : value));
+
+  const modKey = `${sus ?? 'x'}-${seventh ? '7' : ''}-${ninth ? '9' : ''}`;
 
   return (
     <section className="tp-strip">
       <div className="tp-strip__header">
         <span className="tp-strip__eyebrow">In key</span>
-        <div className="tp-size-group" role="group" aria-label="In-key chord family">
+        <div className="tp-size-group" role="group" aria-label="Chord modifiers">
           <button
             type="button"
             className="tp-size-btn"
-            aria-pressed={flavor === 'triads'}
-            onClick={() => setFlavor('triads')}
+            aria-pressed={sus === 2}
+            onClick={() => toggleSus(2)}
           >
-            Triads
+            sus2
           </button>
           <button
             type="button"
             className="tp-size-btn"
-            aria-pressed={flavor === 'sevenths'}
-            onClick={() => setFlavor('sevenths')}
+            aria-pressed={sus === 4}
+            onClick={() => toggleSus(4)}
           >
-            7ths
+            sus4
           </button>
           <button
             type="button"
             className="tp-size-btn"
-            aria-pressed={flavor === 'sus'}
-            onClick={() => setFlavor('sus')}
+            aria-pressed={seventh}
+            onClick={() => setSeventh((v) => !v)}
           >
-            Sus
+            7
+          </button>
+          <button
+            type="button"
+            className="tp-size-btn"
+            aria-pressed={ninth}
+            onClick={() => setNinth((v) => !v)}
+          >
+            9
           </button>
         </div>
         <span className="tp-strip__hint" style={{ marginLeft: 'auto' }}>
@@ -65,8 +91,8 @@ export function DiatonicStrip({ keyValue, onAudition }: DiatonicStripProps) {
           const name = chordName(toAbsolute(chord, keyValue));
           return (
             <StripCell
-              key={`${flavor}-${i}`}
-              id={`diatonic-${flavor}-${i}`}
+              key={`${modKey}-${i}`}
+              id={`diatonic-${modKey}-${i}`}
               chord={chord}
               roman={roman}
               name={name}

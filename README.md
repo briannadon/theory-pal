@@ -5,7 +5,7 @@ A browser-based chord progression assistant: select a key and scale, get corpus-
 ## Features
 
 - **Key and scale selection**: Major, minor, harmonic minor, melodic minor, and all seven diatonic modes.
-- **In-key chord family selection**: Toggle top "In key" row between diatonic Triads, 7ths, and Sus chords.
+- **In-key chord modifiers**: Stack sus2/sus4 (mutually exclusive), 7, and 9 onto the "In key" row; every diatonic chord re-renders with the modifiers applied.
 - **Corpus-driven suggestions**: Next-chord recommendations ranked by probability, trained on a real chord progression corpus with an Order-3 Markov model and theory-rule fallback.
 - **Non-diatonic chords**: Borrowed chords, secondary dominants, and modal mixture are always available, not filtered out.
 - **Built-in piano sound**: Audition chords with Web Audio and a SoundFont player.

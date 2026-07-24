@@ -63,3 +63,23 @@ describe('chordName spelling', () => {
     expect(chordName({ root: 0, quality: 'maj', inversion: 0 })).toBe('C');
   });
 });
+
+describe('chordName with modifiers', () => {
+  it('names added 9ths without a 7th as add9', () => {
+    expect(chordName({ root: 0, quality: 'maj', mods: { ninth: true } })).toBe('Cadd9');
+    expect(chordName({ root: 2, quality: 'min', mods: { ninth: true } })).toBe('Dmadd9');
+  });
+
+  it('absorbs a 9th into the 7th chord’s name', () => {
+    expect(chordName({ root: 0, quality: 'maj7', mods: { ninth: true } })).toBe('Cmaj9');
+    expect(chordName({ root: 7, quality: 'dom7', mods: { ninth: true } })).toBe('G9');
+    expect(chordName({ root: 2, quality: 'min7', mods: { ninth: true } })).toBe('Dm9');
+  });
+
+  it('drops the third-quality marker on sus chords', () => {
+    expect(chordName({ root: 2, quality: 'min7', mods: { sus: 4 } })).toBe('D7sus4');
+    expect(chordName({ root: 0, quality: 'maj7', mods: { sus: 4 } })).toBe('Cmaj7sus4');
+    expect(chordName({ root: 7, quality: 'dom7', mods: { sus: 4, ninth: true } })).toBe('G9sus4');
+    expect(chordName({ root: 0, quality: 'maj', mods: { sus: 2 } })).toBe('Csus2');
+  });
+});
