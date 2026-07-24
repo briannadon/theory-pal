@@ -167,12 +167,8 @@ end-to-end before running the full corpus.
   mode accuracy against McGill Billboard; model trained on a 15k-song sample; harness
   output checked by hand. Hooktheory validation was not done. The Billboard
   annotations served the same purpose.
-- M3. **PARTIAL, uncommitted.** Key picker, both strips, chord cells, hooks, and the
-  tested grid/context logic exist in `src/ui/`. No grid container, transport, MIDI port
-  picker, or App wiring yet; `src/App.tsx` is still the Vite scaffold.
-- M4. **NOT STARTED**, except that grid slot and reorder logic is written and tested.
-  Deploy is done and green ahead of schedule: Pages is enabled, the Action builds and
-  publishes on push, and the site is live.
+- M3. **DONE**. Key picker, diatonic and suggestion strips, chord cells, hooks, grid container, transport, MIDI port picker, and top-level `TheoryPal` layout in `src/App.tsx`.
+- M4. **DONE**. Progression grid container, drag-and-drop slot reordering, playback lookahead scheduler, Web MIDI out, and `.mid` export fully implemented and verified. Deploy pipeline is green: Pages is enabled, GitHub Actions builds and publishes on push.
 - M5 (first post-MVP work, in priority order): extended chords (9ths first, then
   11/13/add) surfaced in strips, grid, and voicing; suggestion blend tuning; strum/arp
   patterns; progression save/share (URL-encoded state is enough, still no backend).

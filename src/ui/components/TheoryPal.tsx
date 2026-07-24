@@ -10,7 +10,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { playProgression, type Playback } from '../../audio/index.ts';
 import { exportMidiFile } from '../../midi/index.ts';
 import { suggest, surprise, type Suggestion } from '../../model/index.ts';
@@ -61,9 +61,9 @@ export function TheoryPal() {
   } = useMidiOut();
   const { model, status: modelStatus } = useModel();
 
-  // Derived context & suggestions
-  const context = deriveContext(grid.slots);
-  const suggestions = suggest(model, { context, key, limit: 7 });
+  // Derived context & suggestions (memoized to prevent unstable object/array references causing re-render loops)
+  const context = useMemo(() => deriveContext(grid.slots), [grid.slots]);
+  const suggestions = useMemo(() => suggest(model, { context, key, limit: 7 }), [model, context, key]);
   const anyFromCorpus = suggestions.some((s) => s.fromCorpus);
 
   // Update surprise suggestion when model, context, key, or reroll count changes
@@ -100,14 +100,15 @@ export function TheoryPal() {
       void ensureInit();
       const abs = toAbsolute(chord, key);
       const voiced = voiceChord(abs);
+      const quarterNoteSec = 60 / bpm;
       if (isPianoEnabled) {
-        engine.playChord(voiced.notes, 0.8);
+        engine.playChord(voiced.notes, quarterNoteSec);
       }
       if (midi.available) {
-        midi.sendChord(voiced.notes, 800);
+        midi.sendChord(voiced.notes, quarterNoteSec * 1000);
       }
     },
-    [ensureInit, key, isPianoEnabled, engine, midi],
+    [ensureInit, key, bpm, isPianoEnabled, engine, midi],
   );
 
   const handleDragEnd = useCallback(

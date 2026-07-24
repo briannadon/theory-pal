@@ -80,9 +80,14 @@ export function playProgression(opts: PlayProgressionOptions): Playback {
       opts.onStep?.(index, time);
       const chord = opts.chords[index];
       if (!chord || chord.notes.length === 0) return;
-      audio?.playAt(chord.notes, time, stepDurationSec, velocity);
-      if (midi?.available && midiOffsetMs !== null) {
-        midi.sendChord(chord.notes, stepDurationSec * 1000, velocity, midiOffsetMs + time * 1000);
+      const beatDurationSec = 60 / opts.bpm;
+      const noteDurationSec = beatDurationSec * 0.85;
+      for (let b = 0; b < beatsPerBar; b++) {
+        const beatTime = time + b * beatDurationSec;
+        audio?.playAt(chord.notes, beatTime, noteDurationSec, velocity);
+        if (midi?.available && midiOffsetMs !== null) {
+          midi.sendChord(chord.notes, noteDurationSec * 1000, velocity, midiOffsetMs + beatTime * 1000);
+        }
       }
     },
     { tickMs: opts.tickMs, lookaheadSec: opts.lookaheadSec, loop: opts.loop ?? false },

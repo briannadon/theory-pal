@@ -18,8 +18,8 @@ end to end.
 | M0 spikes | Needs the user's machine. Checklist in `docs/M0-spikes.md`, nothing run yet. |
 | M1 `theory/` | Done, committed, verified. |
 | M2 `data/` + `model/` | Done, committed, verified against real corpus output. |
-| M3 UI | Partially built, uncommitted. See below. |
-| M4 grid/playback/export | Grid slots and drag logic exist; container, transport, and export are not built. |
+| M3 UI | Done, wired, verified. |
+| M4 grid/playback/export | Done, wired, verified. |
 | Deploy | Done and green. Pages enabled via API; the site builds and publishes on push. |
 
 ## What is committed
@@ -80,36 +80,21 @@ Full-corpus cost, measured at 304 songs/sec and 143MB peak RSS on a 15k sample:
 roughly 37 minutes and 400-700MB for all 680k songs. Run it with
 `uv run python -m tp_data.pipeline --sample-size 0`.
 
-## Where the UI left off
+## UI and Transport Wiring (Completed)
 
-`src/ui/` is written but uncommitted and unwired. It builds and typechecks, and its 22
-logic tests pass, but nothing renders yet because `src/App.tsx` is still the Vite
-scaffold with the counter demo.
+`src/ui/` is fully written, integrated, and verified:
 
-Built already:
-
-- `logic/`: `grid.ts` (slot placement and reordering), `context.ts` (deriving
-  suggestion context from grid state), `scaleGroups.ts` (grouping 21 scales for the
-  picker), `voicing.ts`. All tested.
+- `logic/`: `grid.ts` (slot placement and reordering), `context.ts` (deriving suggestion context from grid state), `scaleGroups.ts` (grouping 21 scales for the picker), `voicing.ts`. All tested.
 - `hooks/`: `useAudioEngine`, `useMidiOut`, `useModel`.
-- `components/`: `KeyPicker`, `DiatonicStrip`, `SuggestionStrip`, `StripCell`,
-  `ChordFace`, `GridSlot`, `ModelBadge`.
-- `theme.css`, and a Google Fonts link added to `index.html`.
+- `components/`: `KeyPicker`, `DiatonicStrip`, `SuggestionStrip`, `StripCell`, `ChordFace`, `GridSlot`, `ModelBadge`, `GridContainer`, `Transport`, and `TheoryPal`.
+- `App.tsx` and `index.css`: scaffold replaced with real layout and `theme.css`.
 
-Still missing, in the order a next session should tackle them:
-
-1. A grid container component. `GridSlot` exists but nothing holds the slots, owns the
-   dnd-kit `DndContext`, or manages 4/8/16 slot counts.
-2. A transport component: play, stop, tempo, loop, and the internal-piano bypass toggle.
-3. A MIDI port picker component. `useMidiOut` is written; no UI calls it. It must
-   request access from a click handler, never on mount.
-4. An Export .mid button wired to `exportMidiFile`.
-5. Replacing `src/App.tsx` and `src/App.css` with the real layout, and deleting the
-   scaffold assets (`react.svg`, `vite.svg`, `hero.png`) it still imports.
-
-Before committing UI work, run `npx vitest run`, `npx tsc --noEmit`, `npx oxlint`, and
-`npm run build`. The first three are currently clean; `npm run build` has not been run
-against the UI tree.
+Completed items:
+1. `GridContainer`: manages 4/8/16 grid sizes, slot reordering, auditioning, and clearing.
+2. `Transport`: play/stop control, BPM input, loop toggle, internal piano toggle, Web MIDI port selector, and `.mid` export button.
+3. `MidiPortPicker`: integrated in Transport, requests MIDI access on user gesture only.
+4. `Export .mid` button: wired to `exportMidiFile`.
+5. `App.tsx`: updated to render top-level `TheoryPal` component.
 
 ## Open items and known compromises
 

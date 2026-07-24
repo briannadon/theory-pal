@@ -88,14 +88,29 @@ describe('playProgression', () => {
 
     playback.start();
     ticker.tick(); // first poll — start() only registers with the ticker, mirroring setInterval
-    expect(audio.playAtCalls).toEqual([{ notes: [60, 64, 67], whenSec: 0, durationSec: 2, velocity: 100 }]);
+    expect(audio.playAtCalls).toEqual([
+      { notes: [60, 64, 67], whenSec: 0, durationSec: 0.425, velocity: 100 },
+      { notes: [60, 64, 67], whenSec: 0.5, durationSec: 0.425, velocity: 100 },
+      { notes: [60, 64, 67], whenSec: 1, durationSec: 0.425, velocity: 100 },
+      { notes: [60, 64, 67], whenSec: 1.5, durationSec: 0.425, velocity: 100 },
+    ]);
 
     clock.set(1.95);
     ticker.tick();
     expect(audio.playAtCalls).toEqual([
-      { notes: [60, 64, 67], whenSec: 0, durationSec: 2, velocity: 100 },
-      { notes: [65, 69, 72], whenSec: 2, durationSec: 2, velocity: 100 },
+      { notes: [60, 64, 67], whenSec: 0, durationSec: 0.425, velocity: 100 },
+      { notes: [60, 64, 67], whenSec: 0.5, durationSec: 0.425, velocity: 100 },
+      { notes: [60, 64, 67], whenSec: 1, durationSec: 0.425, velocity: 100 },
+      { notes: [60, 64, 67], whenSec: 1.5, durationSec: 0.425, velocity: 100 },
+      { notes: [65, 69, 72], whenSec: 2, durationSec: 0.425, velocity: 100 },
+      { notes: [65, 69, 72], whenSec: 2.5, durationSec: 0.425, velocity: 100 },
+      { notes: [65, 69, 72], whenSec: 3, durationSec: 0.425, velocity: 100 },
+      { notes: [65, 69, 72], whenSec: 3.5, durationSec: 0.425, velocity: 100 },
     ]);
+    expect(playback.playing).toBe(true);
+
+    clock.set(4.0);
+    ticker.tick();
     expect(playback.playing).toBe(false); // 2-bar, non-looping sequence is done
   });
 
@@ -121,7 +136,7 @@ describe('playProgression', () => {
     ticker.tick();
 
     expect(steps).toEqual([0, 1, 2]);
-    expect(audio.playAtCalls).toHaveLength(2); // only the two real chords
+    expect(audio.playAtCalls).toHaveLength(8); // 4 quarter notes for chord 1 + 4 quarter notes for chord 3
   });
 
   it('drives MIDI from the same scheduler, converting step time to a performance.now()-timebase timestamp', () => {
@@ -144,14 +159,25 @@ describe('playProgression', () => {
 
     playback.start(); // captures offset = wall(100000) - clock.now()*1000 (0) = 100000
     ticker.tick(); // first poll
-    expect(midi.sendChordCalls).toEqual([{ notes: [60], durationMs: 2000, velocity: 100, whenMs: 100000 }]);
+    expect(midi.sendChordCalls).toEqual([
+      { notes: [60], durationMs: 425, velocity: 100, whenMs: 100000 },
+      { notes: [60], durationMs: 425, velocity: 100, whenMs: 100500 },
+      { notes: [60], durationMs: 425, velocity: 100, whenMs: 101000 },
+      { notes: [60], durationMs: 425, velocity: 100, whenMs: 101500 },
+    ]);
 
     clock.set(1.95);
     wall = 101_950; // wall clock advanced in lockstep with the scheduling clock
     ticker.tick();
     expect(midi.sendChordCalls).toEqual([
-      { notes: [60], durationMs: 2000, velocity: 100, whenMs: 100000 },
-      { notes: [64], durationMs: 2000, velocity: 100, whenMs: 102000 },
+      { notes: [60], durationMs: 425, velocity: 100, whenMs: 100000 },
+      { notes: [60], durationMs: 425, velocity: 100, whenMs: 100500 },
+      { notes: [60], durationMs: 425, velocity: 100, whenMs: 101000 },
+      { notes: [60], durationMs: 425, velocity: 100, whenMs: 101500 },
+      { notes: [64], durationMs: 425, velocity: 100, whenMs: 102000 },
+      { notes: [64], durationMs: 425, velocity: 100, whenMs: 102500 },
+      { notes: [64], durationMs: 425, velocity: 100, whenMs: 103000 },
+      { notes: [64], durationMs: 425, velocity: 100, whenMs: 103500 },
     ]);
   });
 
@@ -166,7 +192,7 @@ describe('playProgression', () => {
     ticker.tick();
 
     expect(midi.sendChordCalls).toEqual([]);
-    expect(audio.playAtCalls).toHaveLength(1);
+    expect(audio.playAtCalls).toHaveLength(4);
   });
 
   it('loops the progression indefinitely when loop is true', () => {
@@ -188,7 +214,9 @@ describe('playProgression', () => {
       clock.set(t);
       ticker.tick();
     }
-    expect(audio.playAtCalls.map((c) => (c as { whenSec: number }).whenSec)).toEqual([0, 2, 4, 6]);
+    expect(audio.playAtCalls.map((c) => (c as { whenSec: number }).whenSec)).toEqual([
+      0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5,
+    ]);
     expect(playback.playing).toBe(true);
   });
 

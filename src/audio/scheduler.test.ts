@@ -82,8 +82,11 @@ describe('StepScheduler', () => {
       [2, 2],
       [3, 3],
     ]);
+    expect(scheduler.running).toBe(true);
 
-    // Sequence exhausted (non-looping): scheduler stops itself.
+    // Sequence finishes playing (after step 3's 1-second duration at t = 4): scheduler stops itself.
+    clock.set(4.0);
+    ticker.tick();
     expect(scheduler.running).toBe(false);
     expect(ticker.stopped).toBe(true);
   });
@@ -174,6 +177,11 @@ describe('StepScheduler', () => {
 
     scheduler.start();
     expect(events).toEqual([0, 1]);
+    // Steps dispatched to lookahead buffer at t=0; scheduler stays active until t=2 when audio finishes playing
+    expect(scheduler.running).toBe(true);
+
+    clock.set(2);
+    capturedTick?.();
     expect(scheduler.running).toBe(false);
     expect(stopCalls).toBe(1); // the synchronous in-tick stop(), not a second one from start()
     expect(capturedTick).not.toBeNull();

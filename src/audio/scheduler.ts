@@ -132,20 +132,20 @@ export class StepScheduler {
 
   private tick(): void {
     if (!this.active) return;
-    const horizon = this.clock.now() + this.lookaheadSec;
+    const now = this.clock.now();
+    const horizon = now + this.lookaheadSec;
     while (this.active && this.stepIndex < this.stepCount && this.nextStepTime < horizon) {
       const index = this.stepIndex;
       const time = this.nextStepTime;
       this.onStep(index, time);
       this.stepIndex++;
       this.nextStepTime += this.stepDurationSec;
-      if (this.stepIndex >= this.stepCount) {
-        if (this.loop) {
-          this.stepIndex = 0;
-        } else {
-          this.stop();
-        }
+      if (this.stepIndex >= this.stepCount && this.loop) {
+        this.stepIndex = 0;
       }
+    }
+    if (!this.loop && this.stepIndex >= this.stepCount && now >= this.nextStepTime) {
+      this.stop();
     }
   }
 }

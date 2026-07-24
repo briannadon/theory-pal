@@ -116,7 +116,7 @@ export interface Suggestion {
 
 export interface SuggestParams { context: RelChord[]; key: Key; limit?: number; }
 
-export async function loadModel(url?: string): Promise<TransitionModel>;
+export async function loadModel(url?: string): Promise<TransitionModel | null>;
 export function suggest(model: TransitionModel | null, p: SuggestParams): Suggestion[];
 export function surprise(model: TransitionModel | null, p: SuggestParams, rng?: () => number): Suggestion | null;
 export function theoryPrior(key: Key, context: RelChord[]): Map<string, number>;

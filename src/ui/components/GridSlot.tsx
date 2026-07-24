@@ -24,6 +24,7 @@ export function GridSlot({ id, index, chord, roman, name, accent, isPlaying, onA
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
     data: { source: 'grid', index },
+    disabled: !chord,
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
@@ -36,11 +37,11 @@ export function GridSlot({ id, index, chord, roman, name, accent, isPlaying, onA
       <button
         type="button"
         className="grid-slot__body"
-        onClick={onAudition}
-        disabled={!chord}
+        onClick={() => {
+          if (chord) onAudition();
+        }}
         aria-label={chord ? `Bar ${index + 1}: ${name}, ${roman}` : `Bar ${index + 1}: empty`}
-        {...attributes}
-        {...listeners}
+        {...(chord ? { ...attributes, ...listeners } : {})}
       >
         <ChordFace roman={roman} name={name} accent={accent} placeholder="+" />
       </button>
