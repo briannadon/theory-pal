@@ -65,6 +65,23 @@ data/
   Python pipeline (offline) to build the model from the Chordonomicon corpus.
 ```
 
+## Model Training & Compression
+
+To re-train the Order-3 Markov model from the Chordonomicon corpus:
+
+```bash
+cd data
+uv sync
+
+# Train via GPU (CUDA) or Multi-Core CPU (auto-detects cores)
+uv run python -m tp_data.pipeline_gpu --sample-size 0 --max-order 3
+# or: uv run python -m tp_data.pipeline_cpu --sample-size 0 --max-order 3
+
+# Prune and compress output model for production web delivery
+uv run python -m tp_data.compress_model
+```
+Outputs the trained, compressed model payload to `public/model/transitions.json`. See [data/README.md](file:///home/bdn/repos/theory-pal/data/README.md) for full pipeline details and flags.
+
 ## Licensing
 
 The code is licensed under the MIT License (see `LICENSE`). The trained model data is derived from the [Chordonomicon](https://huggingface.co/datasets/ailsntua/Chordonomicon) corpus, licensed under CC-BY-NC-4.0, so the model data cannot be used commercially. The NC restriction binds the data and the model derived from it, not the code.

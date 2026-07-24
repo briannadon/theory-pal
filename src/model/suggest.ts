@@ -10,6 +10,7 @@ import {
   DEFAULT_SUGGEST_LIMIT,
   MIN_ORDER1_TOTAL,
   MIN_ORDER2_TOTAL,
+  MIN_ORDER3_TOTAL,
   SURPRISE_MIN_PROBABILITY,
   SURPRISE_POOL_SIZE,
   SURPRISE_SKIP_TOP,
@@ -29,6 +30,13 @@ function corpusCountsForContext(
   modeModel: ModeModel,
   context: RelChord[],
 ): { counts: Record<string, number>; total: number } | null {
+  if (context.length >= 3 && modeModel.order3 && modeModel.totals3) {
+    const key3 = `${stateKey(context[context.length - 3])}>${stateKey(context[context.length - 2])}>${stateKey(context[context.length - 1])}`;
+    const total3 = modeModel.totals3[key3];
+    if (total3 !== undefined && total3 >= MIN_ORDER3_TOTAL) {
+      return { counts: modeModel.order3[key3] ?? {}, total: total3 };
+    }
+  }
   if (context.length >= 2) {
     const key2 = `${stateKey(context[context.length - 2])}>${stateKey(context[context.length - 1])}`;
     const total2 = modeModel.totals2[key2];

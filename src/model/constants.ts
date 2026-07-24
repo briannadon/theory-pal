@@ -37,6 +37,10 @@ export const BLEND_EXPONENT_PRIOR = 0.6;
  */
 export const CONFIDENCE_HALF_COUNT = 8;
 
+/** Minimum total (possibly fractional) order-3 context count before it's
+ * used; below this, back off to order-2. */
+export const MIN_ORDER3_TOTAL = 2.0;
+
 /** Minimum total (possibly fractional) order-2 context count before it's
  * used at all; below this, back off to order-1. Guards against a context
  * seen essentially once producing a spuriously confident (if low-confidence)

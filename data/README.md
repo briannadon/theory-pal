@@ -20,18 +20,40 @@ uv run pytest -q # 20 tests, all synthetic/unit -- no network required
 
 ## Running the pipeline
 
+Training can be run via **Multi-Core CPU** (recommended default) or **Vectorized PyTorch GPU**.
+
+### 1. Multi-Core CPU Training (Fast, multi-processed)
 ```bash
-uv run python -m tp_data.pipeline --sample-size 10000
+# Full corpus training (Order-3, auto-detects all CPU cores)
+uv run python -m tp_data.pipeline_cpu --sample-size 0 --max-order 3
+
+# Sample run (10,000 songs)
+uv run python -m tp_data.pipeline_cpu --sample-size 10000 --max-order 3
 ```
 
-Flags:
+### 2. PyTorch GPU Training (CUDA accelerated)
+```bash
+# Full corpus training (Order-3 on NVIDIA GPU)
+uv run python -m tp_data.pipeline_gpu --sample-size 0 --max-order 3
+```
+
+### 3. Post-Training Model Compression (Required step)
+Once training finishes, compress and prune the raw model payload for production web client delivery:
+```bash
+uv run python -m tp_data.compress_model
+```
+*Reduces model payload size by ~60% (from ~112 MB raw down to 45 MB uncompressed / ~10 MB gzipped over HTTP).*
+
+### Pipeline Flags
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--sample-size` | `10000` | Songs to process. `0` = no limit (full ~680k-row corpus) -- this is the one-line change for the full run. |
-| `--out` | `public/model/transitions.json` | Output path. |
+| `--sample-size` | `10000` | Songs to process. `0` = full ~680k-row corpus. |
+| `--max-order` | `3` | Maximum Markov order (2 or 3). |
+| `--num-workers` | auto | `pipeline_cpu` only. Number of CPU workers. `0`/omitted = all cores; negative integers (e.g. `-2`) reserve cores for system responsiveness. |
+| `--gpu-batch-size` | `2048` | `pipeline_gpu` only. Batch size for PyTorch CUDA key estimation. |
+| `--out` | `public/model/transitions.json` | Output path for trained model JSON. |
 | `--force-download` | off | Re-download the corpus parquet even if `data/.cache/` already has it. |
-| `--batch-size` | `2048` | Arrow record-batch size while streaming rows from the parquet file. Only affects memory/throughput, not results. |
 
 First run downloads a ~92MB parquet file (see "Where the corpus comes from" below)
 to `data/.cache/chordonomicon_v2.parquet` and reuses it on later runs.

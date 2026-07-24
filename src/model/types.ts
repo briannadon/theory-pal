@@ -16,8 +16,10 @@ import type { Key, RelChord, ScaleId } from '../theory/index.ts';
 export interface ModeModel {
   order1: Record<string, Record<string, number>>;
   order2: Record<string, Record<string, number>>;
+  order3?: Record<string, Record<string, number>>;
   totals1: Record<string, number>;
   totals2: Record<string, number>;
+  totals3?: Record<string, number>;
 }
 
 /** The full trained model file. Modes the pipeline could not populate are
