@@ -122,56 +122,97 @@ appears on a deployed origin, never on localhost.
 
 ## Session 2 (2026-07-24)
 
-Four changes, all committed and pushed to `master`:
+All committed and pushed to `master`. Ordered roughly as they were built; the later
+entries revised the earlier ones, so read them in order.
 
-- **In-key modifiers replace the family selector.** Triads/7ths/Sus became four
-  stackable toggles: sus2 and sus4 (mutually exclusive — both replace the third), 7,
-  and 9, freely combined. The quality union stayed closed; alterations ride alongside
-  it as `RelChord.mods` (`ChordMods` in SPEC.md), which `stateKey` ignores, so the
-  trained model is untouched and `model/` needed no changes at all. `chordIntervals`
-  is now the single source of truth for a chord's tones; `chordPitches`, `voiceChord`,
-  `chordName`, and `romanNumeral` all derive from it, with an identity fast path that
-  leaves unmodified chords byte-identical. The 7 toggle is deliberately *not* a mod:
-  it means the degree's diatonic 7th, so it selects `diatonicChords(key, true)`.
-  Modifiers exist on the strip only — a chord freezes as-is when dropped in the grid.
+**Chord vocabulary**
+
+- **Stackable modifiers, on any chord, from one shared bar.** The in-key row's
+  Triads/7ths/Sus selector and the grid tiles' quality dropdown both became
+  `ModifierBar`: sus2, sus4, 6, 7, 9, 11, 13, every one independent and freely
+  combined. The strip restyles all seven chords at once; each grid tile has a `mods`
+  button that pops the same bar up beneath it (click away or Escape to dismiss, and
+  the panel slides back inside the viewport for tiles near an edge).
+- The `ChordQuality` union stayed **closed**. Alterations ride alongside it as
+  `RelChord.mods`, which `stateKey` ignores, so the trained model is untouched and
+  `model/` needed no changes at all — the migration path SPEC.md had sketched for
+  extensions, realized. `chordIntervals` is the single source of truth for a chord's
+  tones; `chordPitches`, `voiceChord`, `chordName` and `romanNumeral` all derive from
+  it, with an identity fast path leaving unmodified chords byte-identical.
+- **The 7 is deliberately not a mod.** Which seventh a degree takes is a fact about
+  the key, so `withSeventh` consults the key's own diatonic 7th — but only when it is
+  built on the same triad, or an augmented chord on degree 0 in C would silently
+  become C major's maj7 and lose its fifth.
+- **Naming** follows lead-sheet convention through `extensionSpelling`: an unbroken
+  stack above the seventh is named by its top note with the rest implied (C13), and
+  anything that doesn't continue the stack is an added tone (C7(add13)). Both
+  renderers consume it, so symbols and numerals cannot disagree. Two pitch-class
+  collisions are handled explicitly: a 6th over a seventh *is* the 13th, and a 6th
+  sits exactly where dim7 puts its bb7 — which is why `ChordShape` reads the seventh
+  from the base quality rather than from the interval set.
+- `ui/logic/chordMods.ts` hides the remaining wrinkle: sus lives both in the quality
+  vocabulary (sus2/sus4/dom7sus4, which the corpus counts) and in mods. It normalizes
+  the first into the second so every toggle is a flag flip.
+
+**Playback, parts and export**
+
+- **A shared note-event IR** (`theory/pattern.ts`). `playProgression` and
+  `exportMidiFile` both render bars through `renderBar`, so audible and exported
+  material can no longer diverge; export keeps its historical whole-bar chords via the
+  `sustain` pattern. Arpeggios (up/down/up-down/down-up/random, 1/4-1/16 plus
+  triplets) ride on top of it.
+- **Chords and melody are separate parts end to end.** One smplr instrument per voice
+  sharing a single sample loader (so the second voice costs no download), each with
+  its own output channel — which is what makes the transport's two faders true faders
+  rather than velocity tricks. Live MIDI puts chords on channel 1 and melody on
+  channel 2, faders send CC 7 per channel, and Stop panics both. `.mid` export stays
+  format 0 for chords alone and becomes format 1 — tempo, chords, melody — once a
+  melody exists.
 - **The soundfont preloads.** `AudioEngine` split into `preload()` (fetch/decode, no
   user gesture) and `init()` (preload plus the gesture-gated `resume()`).
-  `useAudioEngine` fires `preload()` on mount and exposes a load status;
-  `SoundOverlay` blocks the UI until it resolves, with a dismissible failure branch so
-  a dead soundfont doesn't lock the user out of MIDI and export.
+  `useAudioEngine` fires `preload()` on mount; `SoundOverlay` blocks the UI until it
+  resolves, with a dismissible failure branch so a dead soundfont doesn't lock the
+  user out of MIDI and export.
 - **Stop is immediate.** `playProgression` hands smplr a whole bar of timestamped
   notes at once, and smplr's `stop()` only releases *started* voices, so the rest of
-  the bar kept playing after Stop. `AudioEngine.stopAll` now clears smplr's scheduler
-  queue first.
-- **Grid drag/drop no longer double-animates.** Slot ids are positional, so dnd-kit's
-  default layout animation replayed the reorder the drag preview had already shown;
-  `animateLayoutChanges: () => false` on the sortable settles it in place.
+  the bar kept playing. `AudioEngine.stopAll` now clears smplr's scheduler queue
+  first.
 
-- **Arpeggios, a melody lane, and a melody generator.** `theory/pattern.ts` introduces
-  the `NoteEvent` IR every playing style resolves to; `playProgression` and
-  `exportMidiFile` both render through `renderBar`, so audible and exported material
-  can no longer diverge (export keeps its historical whole-bar chords via the
-  `sustain` pattern). `theory/melody.ts` holds the lane model — pitches relative to
-  the tonic, monophonic, variable-length notes on a 1/8 or 1/16 grid — and
-  `theory/generate.ts` is a melody generator whose pitch scoring ports Temperley's RPK
-  model (range x proximity x Essen key profiles) into log space, with harmony and
-  rhythm rules on top and one `surprise` knob unlocking liberties in stages against a
-  per-phrase budget, hash-addressed per decision so the slider morphs a melody instead
-  of rerolling it. Output is deliberately sparse and stepwise — see the header comment
-  for what the literature dictated and which rules are deliberately absent. UI: `MelodyLane` (rows tinted
-  chord tone / scale tone / off-scale per bar, click to add, drag to move or lengthen,
-  click to delete) and `MelodySection` (resolution, generate, surprise, clear).
+**Melody**
 
-- **Chords and melody are separate parts end to end.** The audio engine builds one
-  smplr instrument per voice sharing a single sample loader (so the second voice costs
-  no download), each with its own output channel, which is what makes the mixer a true
-  fader rather than a velocity trick. Live MIDI puts chords on channel 1 and melody on
-  channel 2, faders send CC 7 per channel, and Stop panics both. `.mid` export stays a
-  format-0 single track for chords alone, and becomes format 1 — tempo track, chord
-  track, melody track — as soon as a melody exists.
+- **The lane** (`theory/melody.ts` + `ui/MelodyLane`). Pitches are stored relative to
+  the tonic, so a key change transposes the melody with the progression; notes are
+  monophonic and variable-length on a 1/8 or 1/16 grid. Rows are tinted by what each
+  pitch means against the chord in that bar, and hovering a bar — in the lane or its
+  tile above — resolves the whole lane to that chord in three tiers (its tones, other
+  scale tones in grey, off-scale pushed back). Gestures: drag to draw a note as long
+  as the drag, drag to move, drag the right edge to lengthen, **Alt**-click or
+  Alt-drag a box to delete. Note names sit in a fixed gutter whose keys are clickable
+  to audition.
+- **The generator** (`theory/generate.ts`) is a rule engine, not a model — the corpus
+  is chords only — but its pitch scoring is a port of Temperley's RPK model (range x
+  proximity x Essen key profiles) into log space, with the harmony and rhythm rules
+  RPK doesn't cover layered on top. Lines are capped near Essen's 13.6-semitone
+  average span, move by step ~80% of the time, and are deliberately sparse. One
+  `surprise` knob unlocks liberties in stages against a per-phrase budget, and every
+  decision is hash-addressed by (seed, bar, step, class), so moving the slider morphs
+  the melody rather than rerolling it. The header comment records which rules are
+  deliberately *absent* and why (post-skip reversal falls out of tessitura).
 
-Still unaddressed from the list above: vendored soundfont and self-hosted fonts,
-`chordName` key context, the 15k-song model, and the M0 hardware spikes.
+**Interaction fixes**
+
+- Grid columns are fixed-width, so slots line up with the strip tiles above.
+- Grid drag/drop no longer double-animates: slot ids are positional, so dnd-kit's
+  layout animation was replaying the reorder the drag preview had already shown.
+
+**Known gaps for next time**
+
+- The melody voice is the same sampled piano as the chords; only its channel and
+  level are separate. A different instrument for the lead means a second soundfont.
+- Per-slot arpeggio overrides don't exist — the pattern is global to the transport.
+- `.mid` export is still one chord per bar of 4/4; the IR could express more.
+- Everything from the older list below still stands: vendored soundfont and fonts,
+  `chordName` key context, the 15k-song model, and the M0 hardware spikes.
 
 ## Commands
 

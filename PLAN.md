@@ -230,12 +230,18 @@ with probabilities, live MIDI out on Linux, open data pipeline.
   single "surprise" slider that stages rule violations rather than exposing one
   toggle per rule. Lane pitches are stored relative to the tonic, notes are
   variable-length and monophonic, and the lane grid is 1/8 or 1/16.
-- (2026-07-24) In-key chords are built by stacking modifiers — sus2/sus4 mutually
-  exclusive, 7 and 9 independent — rather than picking one prebuilt family. Modifiers
-  live on the strip only; a chord is frozen as-is when dropped into the grid.
+- (2026-07-24) Chords are built by stacking modifiers — sus2, sus4, 6, 7, 9, 11, 13,
+  every one independent and freely combined — rather than picking a prebuilt family or
+  a quality from a list. The same toggle bar serves the in-key row (restyling all
+  seven at once) and each grid tile (via a popover), so the two cannot diverge. sus2
+  and sus4 are *not* exclusive: both replace the third, and together they give the 2nd
+  and the 4th over the fifth.
+- (2026-07-24) Chords and melody are separate parts: own audio voice and level, own
+  live MIDI channel, own track in a format-1 `.mid` export.
 - No drag-out; `Export .mid` is sufficient.
 - Built-in simple piano sound with a bypass toggle.
-- Extensions (esp. 9ths) are the top post-MVP feature.
+- Extensions (esp. 9ths) are the top post-MVP feature. (Shipped 2026-07-24, through
+  6ths/11ths/13ths.)
 
 ## Porting path (if a plugin is wanted later)
 
