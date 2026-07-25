@@ -39,6 +39,11 @@
   --lane-scale: rgba(148, 151, 255, 0.07);
   --lane-off: #101219;
 
+  /* The melody lane's note-name gutter. The progression grid indents by the
+     same amount so a chord tile sits exactly over the melody steps it sounds
+     against — both are drawn at the same pixels-per-beat. */
+  --lane-gutter-w: 46px;
+
   --focus-ring: #9497ff;
   --radius: 6px;
   --radius-lg: 10px;
@@ -540,7 +545,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  width: 46px;
+  width: var(--lane-gutter-w);
   padding-right: 6px;
   box-sizing: border-box;
   font-family: var(--font-mono);
@@ -624,7 +629,9 @@
   opacity: 0.5;
 }
 
-.tp-lane__barline {
+/* One span per chord slot, so the marks fall where the harmony changes —
+   which is no longer the same thing as where the bars are. */
+.tp-lane__segment {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -632,13 +639,23 @@
   pointer-events: none;
 }
 
-.tp-lane__barline--playing {
+.tp-lane__segment--playing {
   background: rgba(148, 151, 255, 0.08);
 }
 
-.tp-lane__barline--hovered {
+.tp-lane__segment--hovered {
   border-left-color: var(--accent-diatonic);
   box-shadow: inset -1px 0 0 var(--accent-diatonic);
+}
+
+/* The bars themselves, behind the chord spans and dimmer than them. */
+.tp-lane__gridline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dashed var(--bg-3);
+  pointer-events: none;
 }
 
 .tp-lane__note {
@@ -735,13 +752,48 @@
   color: var(--ink);
 }
 
-/* Fixed 104px columns (not minmax(…, 1fr)) so grid slots share the exact
-   pitch of the 104px strip cells above and line up column-for-column. */
+/* The grid is a timeline: a tile is as wide as its chord is long, at the same
+   pixels-per-beat the melody lane below uses, so the two read as one ruler.
+   That makes it wider than the viewport at 16 bars, hence its own scroller. */
+.tp-grid__scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-bottom: 4px;
+}
+
+.tp-grid__track {
+  position: relative;
+  margin-left: calc(var(--lane-gutter-w) + 1px); /* + the lane's left border */
+}
+
+.tp-grid__ruler {
+  position: relative;
+  height: 13px;
+}
+
+.tp-grid__bar-number {
+  position: absolute;
+  top: 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 13px;
+  color: var(--ink-faint);
+  padding-left: 4px;
+  border-left: 1px solid var(--line);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+/* Bar lines live on the container, not on the tiles, because chords no longer
+   agree with bars — one can be shorter than a bar or run straight across a
+   barline, and the lines have to stay put when it does. */
 .tp-grid__cells {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 104px);
-  gap: 8px;
-  justify-content: start;
+  display: flex;
+  align-items: flex-start;
+  background-image:
+    repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px var(--bar-w)),
+    repeating-linear-gradient(to right, var(--bg-3) 0 1px, transparent 1px var(--beat-w));
+  background-position: 0 0;
 }
 
 .grid-slot {
@@ -749,6 +801,8 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding: 0 3px 0 2px;
+  box-sizing: border-box;
   touch-action: none;
 }
 
@@ -848,14 +902,73 @@
   flex-wrap: nowrap;
 }
 
-.grid-slot__index {
+/* How long this chord lasts, in beats — the number the grip is setting.
+   Inside the chord face rather than under it, where the mods button lives. */
+.grid-slot__beats {
   position: absolute;
-  bottom: 4px;
-  left: 7px;
+  top: 54px;
+  right: 10px;
   font-family: var(--font-mono);
   font-size: 9px;
   color: var(--ink-faint);
   pointer-events: none;
+}
+
+/* The resize grip: the tile's right edge. Dragging it sets the chord's
+   length, snapped to the grid's current division. */
+.grid-slot__grip {
+  all: unset;
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 7px;
+  height: 72px;
+  cursor: ew-resize;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  touch-action: none;
+}
+
+.grid-slot__grip:hover,
+.grid-slot__grip:focus-visible {
+  background: var(--accent-diatonic);
+  opacity: 0.55;
+}
+
+/* Short chords can't hold their own text, so a tile sheds it in stages: the
+   chord name first, then the numeral and its controls. What survives longest
+   is what a two-pixel-wide chord still needs — its color, and a way to delete
+   it. The tooltip and the aria label always say the whole thing. */
+.grid-slot--narrow .chord-face__name,
+.grid-slot--narrow .grid-slot__beats,
+.grid-slot--tiny .chord-face__name,
+.grid-slot--tiny .chord-face__roman,
+.grid-slot--tiny .chord-face__placeholder,
+.grid-slot--tiny .grid-slot__beats,
+.grid-slot--tiny .grid-slot__mods-btn {
+  display: none;
+}
+
+.grid-slot--narrow .chord-face__roman {
+  font-size: 13px;
+}
+
+.grid-slot--narrow .chord-face,
+.grid-slot--tiny .chord-face {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.grid-slot--narrow .grid-slot__mods-btn {
+  font-size: 8px;
+}
+
+.grid-slot--tiny .grid-slot__clear {
+  top: 2px;
+  right: 2px;
+}
+
+.grid-slot--tiny .grid-slot__grip {
+  width: 4px;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -1066,7 +1179,10 @@
     justify-content: flex-start;
   }
 
-  .tp-grid__cells {
-    grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  /* The timeline keeps its scale on a phone and scrolls instead of
+     compressing: a tile's width is a duration, so squeezing it would be
+     saying something false about the music. */
+  .tp-grid__header {
+    flex-wrap: wrap;
   }
 }

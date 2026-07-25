@@ -1,5 +1,7 @@
-// Bar rendering: a voiced chord plus a playing style -> the individual notes
-// that actually sound, with their positions inside the bar.
+// Span rendering: a voiced chord plus a playing style -> the individual notes
+// that actually sound, with their positions inside the span the chord is held
+// for. That span is usually a bar, but chords carry their own lengths, so it
+// is just as often three beats or half of one.
 //
 // This is the intermediate representation everything downstream shares.
 // Before it existed, `audio/playback.ts` hardcoded "hit the whole chord on
@@ -9,19 +11,19 @@
 // a new style (arpeggios here, melody lines later) is added in one place.
 //
 // Beats, not seconds: the caller owns tempo. `startBeat` is relative to the
-// start of its own bar.
+// start of the span itself.
 import type { VoicedChord } from './voicing.ts';
 
 export interface NoteEvent {
   note: number; // MIDI note number
-  startBeat: number; // beats from the start of the bar
+  startBeat: number; // beats from the start of the span
   durationBeats: number;
   velocity: number; // 0-127
 }
 
 /** Order the chord's notes are walked in. Two entries aren't arpeggios at all:
  * `block` strikes the whole chord on every beat (the v1 playback behavior) and
- * `sustain` holds it for the whole bar (what `.mid` export has always
+ * `sustain` holds it for the whole span (what `.mid` export has always
  * written). Both live here so every consumer has one rendering path. */
 export type ArpPattern = 'sustain' | 'block' | 'up' | 'down' | 'updown' | 'downup' | 'random';
 
@@ -81,11 +83,18 @@ function order(pattern: ArpPattern, n: number): number[] {
 }
 
 /**
- * The notes a single bar of `chord` produces under `style`.
+ * The notes a single span of `chord` produces under `style`.
+ *
+ * `spanBeats` is how long the chord is held — a whole bar in the simple case,
+ * but chords carry their own rhythm now (see `ui/logic/grid.ts`), so this is
+ * also 3 beats, or half of one. Nothing here assumes a bar: every pattern
+ * fills the span it is given and no event runs past its end, so a 1-beat stab
+ * is a 1-beat stab in every sink that renders it.
  *
  * `block` reproduces the original playback exactly: the full chord struck on
  * every beat, each note held for `gate` of a beat. Arpeggio patterns walk the
- * voicing one note per step at `rate`, cycling until the bar is full.
+ * voicing one note per step at `rate`, cycling until the span is full — a span
+ * shorter than one step still gets a single note rather than silence.
  *
  * `random` needs an `rng` for reproducibility (the caller owns seeding, as
  * `model/surprise` already does); without one it falls back to `up`.
@@ -93,10 +102,10 @@ function order(pattern: ArpPattern, n: number): number[] {
 export function renderBar(
   chord: VoicedChord,
   style: BarStyle,
-  beatsPerBar: number,
+  spanBeats: number,
   rng?: () => number,
 ): NoteEvent[] {
-  if (chord.notes.length === 0) return [];
+  if (chord.notes.length === 0 || spanBeats <= 0) return [];
 
   const gate = style.gate ?? DEFAULT_GATE;
   const velocity = style.velocity ?? DEFAULT_VELOCITY;
@@ -105,16 +114,19 @@ export function renderBar(
     return chord.notes.map((note) => ({
       note,
       startBeat: 0,
-      durationBeats: beatsPerBar,
+      durationBeats: spanBeats,
       velocity,
     }));
   }
 
   if (style.pattern === 'block') {
     const events: NoteEvent[] = [];
-    for (let b = 0; b < beatsPerBar; b++) {
+    for (let b = 0; b < spanBeats; b++) {
+      // The gate applies to whatever is left of the span, so a half-beat stab
+      // is a gated half-beat rather than a note that outlives its own chord.
+      const durationBeats = Math.min(1, spanBeats - b) * gate;
       for (const note of chord.notes) {
-        events.push({ note, startBeat: b, durationBeats: gate, velocity });
+        events.push({ note, startBeat: b, durationBeats, velocity });
       }
     }
     return events;
@@ -122,7 +134,7 @@ export function renderBar(
 
   const notes = pool(chord, Math.max(1, style.octaves ?? DEFAULT_OCTAVES));
   const stepBeats = RATE_BEATS[style.rate];
-  const steps = Math.floor(beatsPerBar / stepBeats + 1e-9);
+  const steps = Math.max(1, Math.floor(spanBeats / stepBeats + 1e-9));
   const seq = order(style.pattern, notes.length);
 
   const events: NoteEvent[] = [];
@@ -131,10 +143,11 @@ export function renderBar(
       style.pattern === 'random' && rng
         ? Math.min(notes.length - 1, Math.floor(rng() * notes.length))
         : seq[s % seq.length];
+    const startBeat = s * stepBeats;
     events.push({
       note: notes[index],
-      startBeat: s * stepBeats,
-      durationBeats: stepBeats * gate,
+      startBeat,
+      durationBeats: Math.min(stepBeats, spanBeats - startBeat) * gate,
       velocity,
     });
   }

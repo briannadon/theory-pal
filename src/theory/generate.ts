@@ -54,7 +54,15 @@ import { emptyMelody, type MelodyLane, type MelodyNote } from './melody.ts';
 import { getScale } from './scales.ts';
 
 export interface GenerateMelodyOptions {
+  /** The chord under each bar's downbeat. Rhythm is still organized in bars —
+   * the cell structure and the AAAB variation are bar-level ideas — so this is
+   * what shapes the phrase. */
   slots: readonly (RelChord | null)[];
+  /** The chord sounding at a given step, when chords change inside a bar.
+   * Consulted per note so a line written over a 3 + 1 bar targets the pickup
+   * chord's tones on the fourth beat rather than the downbeat chord's.
+   * Defaults to the bar's chord. */
+  chordAtStep?: (step: number) => RelChord | null;
   key: Key;
   stepsPerBar: 8 | 16;
   /** 0 = obey every rule, 1 = break them as often as the gates allow. */
@@ -457,9 +465,7 @@ export function generateMelody(opts: GenerateMelodyOptions): MelodyLane {
   let highUsed = -Infinity;
 
   for (let bar = 0; bar < barCount; bar++) {
-    const chord = slots[bar];
-    const chordTones = chord ? chordTonePitches(chord, lowPitch, highPitch) : scale;
-    if (chordTones.length === 0) continue;
+    const barChord = slots[bar];
 
     // AAAB: reuse the cell, varying it on the last bar and — as surprise
     // rises — occasionally elsewhere too.
@@ -480,6 +486,15 @@ export function generateMelody(opts: GenerateMelodyOptions): MelodyLane {
       const { at: stepInBar, len } = cellNotes[i];
       const strong = isStrong(stepInBar, stepsPerBar);
       const isLast = bar === barCount - 1 && i === cellNotes.length - 1;
+      const start = bar * stepsPerBar + stepInBar;
+
+      // Harmony is resolved per note, not per bar: a bar can hold more than
+      // one chord now, and a line that keeps aiming at the downbeat chord
+      // through a mid-bar change is exactly the wrong note in the wrong place.
+      const chord = opts.chordAtStep?.(start) ?? barChord;
+      const tones = chord ? chordTonePitches(chord, lowPitch, highPitch) : scale;
+      const chordTones = tones.length > 0 ? tones : scale;
+      if (chordTones.length === 0) continue;
 
       const liberty = spent < budget && hashRandom(seed, bar, stepInBar, 1) < surprise;
       const ctx: ScoreContext = {
@@ -532,7 +547,6 @@ export function generateMelody(opts: GenerateMelodyOptions): MelodyLane {
       );
       if (liberty) spent++;
 
-      const start = bar * stepsPerBar + stepInBar;
       const nextStart =
         i + 1 < cellNotes.length ? bar * stepsPerBar + cellNotes[i + 1].at : (bar + 1) * stepsPerBar;
       notes.push({ pitch, start, length: Math.max(1, Math.min(len, nextStart - start)) });

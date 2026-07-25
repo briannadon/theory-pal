@@ -136,6 +136,37 @@ describe('exportMidiFile', () => {
     expect(ticks[ticks.length - 1]).toBe(2 * 1920); // 2 bars total, including the trailing silent one
   });
 
+  it('writes each chord for as long as slotBeats says, not a bar apiece', async () => {
+    // Bar 1 as 3 + 1, then a whole bar: ticks 0, 1440, 1920.
+    const bars: (AbsChord | null)[] = [
+      { root: 0, quality: 'maj' },
+      { root: 7, quality: 'maj' },
+      { root: 5, quality: 'maj' },
+    ];
+    const parsed = await parse(exportMidiFile(bars, 120, { slotBeats: [3, 1, 4] }));
+    const track = parsed.tracks[0];
+    const ticks = absoluteTicks(track);
+    const onsets = new Set(track.map((e, i) => (isNoteOn(e) ? ticks[i] : -1)));
+    onsets.delete(-1);
+    expect([...onsets].sort((a, b) => a - b)).toEqual([0, 1440, 1920]);
+    // Three bars' worth of slots, two bars of music: the file ends with it.
+    expect(ticks[ticks.length - 1]).toBe(3840);
+  });
+
+  it('holds the melody to its own even bars while the chords move under it', async () => {
+    const bars: (AbsChord | null)[] = [{ root: 0, quality: 'maj' }, { root: 7, quality: 'maj' }];
+    const parsed = await parse(
+      exportMidiFile(bars, 120, {
+        slotBeats: [3, 1],
+        melody: [[{ note: 72, startBeat: 2, durationBeats: 1, velocity: 90 }]],
+      }),
+    );
+    const melodyTrack = parsed.tracks[2];
+    const ticks = absoluteTicks(melodyTrack);
+    const onset = ticks[melodyTrack.findIndex((e) => isNoteOn(e))];
+    expect(onset).toBe(960); // bar 1, beat 3 — unmoved by the chords being cut 3 + 1
+  });
+
   it('an all-null progression exports silently without throwing', async () => {
     const bars: (AbsChord | null)[] = [null, null, null, null];
     const blob = exportMidiFile(bars, 120);

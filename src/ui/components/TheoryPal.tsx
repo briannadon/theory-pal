@@ -19,6 +19,7 @@ import {
   emptyMelody,
   melodyPitchToMidi,
   melodyToBars,
+  melodyToSegments,
   toAbsolute,
   voiceChord,
   DEFAULT_BAR_STYLE,
@@ -32,12 +33,17 @@ import { useMidiOut } from '../hooks/useMidiOut.ts';
 import { useModel } from '../hooks/useModel.ts';
 import { deriveContext } from '../logic/context.ts';
 import {
+  BEATS_PER_BAR,
   clearSlot,
   createGrid,
   parseSlotIndex,
+  placeChord,
   reorderGrid,
   resizeGrid,
+  resizeSlot,
   setSlot,
+  slotStarts,
+  type Division,
   type GridSize,
   type GridState,
 } from '../logic/grid.ts';
@@ -64,7 +70,8 @@ export function TheoryPal() {
   const [style, setStyle] = useState<BarStyle>(DEFAULT_BAR_STYLE);
   const [melody, setMelody] = useState<MelodyLane>(() => emptyMelody(8));
   const [melodySurprise, setMelodySurprise] = useState<number>(0.25);
-  const [hoveredBar, setHoveredBar] = useState<number | null>(null);
+  const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
+  const [division, setDivision] = useState<Division>(0.5);
   const [volumes, setVolumes] = useState<{ chords: number; melody: number }>({
     chords: 0.85,
     melody: 1,
@@ -84,7 +91,19 @@ export function TheoryPal() {
   const { model, status: modelStatus } = useModel();
 
   // Derived context & suggestions (memoized to prevent unstable object/array references causing re-render loops)
-  const context = useMemo(() => deriveContext(grid.slots), [grid.slots]);
+  // Chords alone, for everything that reasons about harmony rather than time:
+  // the suggestion context, voice leading, and the melody lane's coloring.
+  const chords = useMemo(() => grid.slots.map((s) => s.chord), [grid.slots]);
+  const segments = useMemo(() => {
+    const starts = slotStarts(grid);
+    return grid.slots.map((slot, i) => ({ chord: slot.chord, start: starts[i], beats: slot.beats }));
+  }, [grid]);
+  // The lane's columns are beats wide, and the progression grid draws its
+  // tiles at the same scale, so a chord tile sits over exactly the melody
+  // steps it sounds against.
+  const beatWidth = melody.stepsPerBar === 8 ? 36 : 44;
+
+  const context = useMemo(() => deriveContext(chords), [chords]);
   const suggestions = useMemo(() => suggest(model, { context, key, limit: 7 }), [model, context, key]);
   const anyFromCorpus = suggestions.some((s) => s.fromCorpus);
 
@@ -179,8 +198,8 @@ export function TheoryPal() {
         } else if (typeof over.id === 'string') {
           targetIndex = parseSlotIndex(over.id);
         }
-        if (targetIndex !== null && targetIndex >= 0 && targetIndex < grid.size) {
-          setGrid((g) => setSlot(g, targetIndex, activeData.chord as RelChord));
+        if (targetIndex !== null && targetIndex >= 0 && targetIndex < grid.slots.length) {
+          setGrid((g) => placeChord(g, targetIndex, activeData.chord as RelChord));
         }
       }
 
@@ -198,7 +217,7 @@ export function TheoryPal() {
         }
       }
     },
-    [grid.size],
+    [grid.slots.length],
   );
 
   const handlePlayPause = useCallback(async () => {
@@ -210,26 +229,25 @@ export function TheoryPal() {
       return;
     }
 
-    let lastFilled = -1;
-    for (let i = grid.slots.length - 1; i >= 0; i--) {
-      if (grid.slots[i] !== null) {
-        lastFilled = i;
-        break;
-      }
-    }
+    const lastFilled = grid.slots.reduce((last, s, i) => (s.chord !== null ? i : last), -1);
     if (lastFilled < 0) return;
 
     await ensureInit();
     engine.setEnabled(isPianoEnabled);
 
     const activeSlots = grid.slots.slice(0, lastFilled + 1);
-    const voicedChords = voiceGrid(activeSlots, key);
+    const slotBeats = activeSlots.map((s) => s.beats);
+    const voicedChords = voiceGrid(
+      activeSlots.map((s) => s.chord),
+      key,
+    );
     const playback = playProgression({
       chords: voicedChords,
+      slotBeats,
       bpm,
       loop: isLooping,
       style,
-      melody: melodyToBars(melody, key, activeSlots.length),
+      melody: melodyToSegments(melody, key, slotBeats),
       audio: engine,
       midi: midi.available ? midi : undefined,
       onStep: (index) => setPlayingIndex(index),
@@ -241,20 +259,19 @@ export function TheoryPal() {
   }, [isPlaying, grid.slots, ensureInit, engine, isPianoEnabled, key, bpm, isLooping, midi, style, melody]);
 
   const handleExportMidi = useCallback(() => {
-    let lastFilled = -1;
-    for (let i = grid.slots.length - 1; i >= 0; i--) {
-      if (grid.slots[i] !== null) {
-        lastFilled = i;
-        break;
-      }
-    }
+    const lastFilled = grid.slots.reduce((last, s, i) => (s.chord !== null ? i : last), -1);
     if (lastFilled < 0) return;
 
     const activeSlots = grid.slots.slice(0, lastFilled + 1);
-    const absBars = activeSlots.map((s) => (s !== null ? toAbsolute(s, key) : null));
-    const blob = exportMidiFile(absBars, bpm, {
+    const slotBeats = activeSlots.map((s) => s.beats);
+    const absChords = activeSlots.map((s) => (s.chord !== null ? toAbsolute(s.chord, key) : null));
+    // Chords export on their own uneven timeline; the melody exports on the
+    // bars it was written against, which is every bar the chords cover.
+    const bars = Math.ceil(slotBeats.reduce((t, b) => t + b, 0) / BEATS_PER_BAR);
+    const blob = exportMidiFile(absChords, bpm, {
       style,
-      melody: melodyToBars(melody, key, activeSlots.length),
+      slotBeats,
+      melody: melodyToBars(melody, key, bars),
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -268,7 +285,7 @@ export function TheoryPal() {
   // quality/mods split (see ui/logic/chordMods.ts), so there is nothing to
   // reassemble here.
   const handleModifySlot = useCallback((index: number, chord: RelChord) => {
-    setGrid((g) => (g.slots[index] ? setSlot(g, index, chord) : g));
+    setGrid((g) => (g.slots[index]?.chord ? setSlot(g, index, chord) : g));
   }, []);
 
   return (
@@ -301,15 +318,23 @@ export function TheoryPal() {
             onAuditionSlot={handleAudition}
             onClearSlot={(idx: number) => setGrid((g) => clearSlot(g, idx))}
             onModifySlot={handleModifySlot}
-            onHoverSlot={setHoveredBar}
+            onHoverSlot={setHoveredSlot}
+            onResizeSlot={(idx: number, beats: number) =>
+              setGrid((g) => resizeSlot(g, idx, beats))
+            }
+            division={division}
+            onDivisionChange={setDivision}
+            beatWidth={beatWidth}
           />
           <MelodySection
             lane={melody}
             keyValue={key}
-            slots={grid.slots}
-            playingBar={playingIndex}
-            hoveredBar={hoveredBar}
-            onHoverBar={setHoveredBar}
+            segments={segments}
+            bars={grid.size}
+            playingSlot={playingIndex}
+            hoveredSlot={hoveredSlot}
+            onHoverSlot={setHoveredSlot}
+            beatWidth={beatWidth}
             surprise={melodySurprise}
             onSurpriseChange={setMelodySurprise}
             onChange={setMelody}
@@ -337,7 +362,7 @@ export function TheoryPal() {
           onRequestMidiAccess={requestMidiAccess}
           onSelectMidiPort={selectMidiPort}
           onExportMidi={handleExportMidi}
-          hasChordsInGrid={grid.slots.some((s) => s !== null)}
+          hasChordsInGrid={chords.some((c) => c !== null)}
         />
       </div>
     </DndContext>

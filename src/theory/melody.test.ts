@@ -5,6 +5,7 @@ import {
   melodyPitchToMidi,
   melodyRowKind,
   melodyToBars,
+  melodyToSegments,
   setMelodyResolution,
   MELODY_BASE_MIDI,
   type Key,
@@ -75,6 +76,40 @@ describe('melodyToBars', () => {
   it('leaves empty bars null and drops notes past the end', () => {
     const bars = melodyToBars(lane([{ pitch: 0, start: 40, length: 1 }]), cMajor, 2);
     expect(bars).toEqual([null, null]);
+  });
+});
+
+describe('melodyToSegments', () => {
+  // A 3 + 1 bar (a chord and its one-beat pickup) followed by a whole bar.
+  const uneven = [3, 1, 4];
+  const line = lane([
+    { pitch: 0, start: 0, length: 2 }, // beat 0
+    { pitch: 4, start: 6, length: 2 }, // beat 3 — under the pickup chord
+    { pitch: 7, start: 8, length: 4 }, // beat 4 — bar 2
+  ]);
+
+  it('files each note under the chord sounding when it starts, in slot-relative beats', () => {
+    const segments = melodyToSegments(line, cMajor, uneven);
+    expect(segments[0]?.map((e) => e.startBeat)).toEqual([0]);
+    expect(segments[1]?.map((e) => e.startBeat)).toEqual([0]); // beat 3 is slot 1's beat 0
+    expect(segments[2]?.map((e) => e.startBeat)).toEqual([0]);
+  });
+
+  it('keeps a note whole where it rings on past the chord change', () => {
+    const held = lane([{ pitch: 0, start: 0, length: 8 }]); // a whole bar, over a 3 + 1
+    const segments = melodyToSegments(held, cMajor, uneven);
+    expect(segments[0]).toEqual([expect.objectContaining({ startBeat: 0, durationBeats: 4 })]);
+    expect(segments[1]).toBeNull();
+  });
+
+  it('drops notes past the end of the timeline', () => {
+    const segments = melodyToSegments(line, cMajor, [3, 1]);
+    expect(segments).toHaveLength(2);
+    expect(segments[1]).toHaveLength(1);
+  });
+
+  it('agrees with melodyToBars on an even timeline', () => {
+    expect(melodyToSegments(line, cMajor, [4, 4])).toEqual(melodyToBars(line, cMajor, 2));
   });
 });
 

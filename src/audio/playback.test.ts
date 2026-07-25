@@ -316,6 +316,87 @@ describe('playProgression', () => {
     expect(playback.playing).toBe(true);
   });
 
+  it('gives each slot its own length, so a 3 + 1 bar plays as one', () => {
+    const clock = fakeClock();
+    const ticker = manualTicker();
+    const audio = fakeAudioEngine();
+
+    const playback = playProgression({
+      chords: [chord([60]), chord([67]), chord([65])],
+      slotBeats: [3, 1, 4],
+      bpm: 120, // 0.5s/beat
+      style: { pattern: 'sustain', rate: '1/4' },
+      audio,
+      clock,
+      ticker,
+    });
+
+    playback.start();
+    clock.set(3);
+    ticker.tick();
+
+    // The 3-beat chord sounds for 1.5s, the 1-beat pickup lands on beat 4 and
+    // sounds for 0.5s, and bar 2 starts on time at 2s.
+    expect(grouped(audio.playAtCalls)).toEqual([
+      { notes: [60], whenSec: 0, durationSec: 1.5, velocity: 100 },
+      { notes: [67], whenSec: 1.5, durationSec: 0.5, velocity: 100 },
+      { notes: [65], whenSec: 2, durationSec: 2, velocity: 100 },
+    ]);
+  });
+
+  it('loops an uneven progression on its own total length', () => {
+    const clock = fakeClock();
+    const ticker = manualTicker();
+    const audio = fakeAudioEngine();
+
+    const playback = playProgression({
+      chords: [chord([60]), chord([67])],
+      slotBeats: [3, 1],
+      bpm: 120,
+      loop: true,
+      style: { pattern: 'sustain', rate: '1/4' },
+      audio,
+      clock,
+      ticker,
+    });
+
+    playback.start();
+    clock.set(3.9);
+    ticker.tick();
+    expect(audio.playAtCalls.map((c) => (c as { whenSec: number }).whenSec)).toEqual([
+      0, 1.5, 2, 3.5,
+    ]);
+  });
+
+  it('places melody notes against the slot they start in, not the bar', () => {
+    const clock = fakeClock();
+    const ticker = manualTicker();
+    const audio = fakeAudioEngine();
+
+    const playback = playProgression({
+      chords: [chord([60]), chord([67])],
+      slotBeats: [3, 1],
+      bpm: 120,
+      style: { pattern: 'sustain', rate: '1/4' },
+      // Written relative to the 1-beat slot that starts on beat 4.
+      melody: [null, [{ note: 79, startBeat: 0, durationBeats: 1, velocity: 90 }]],
+      audio,
+      clock,
+      ticker,
+    });
+
+    playback.start();
+    clock.set(2);
+    ticker.tick();
+    expect(audio.playAtCalls).toContainEqual({
+      notes: [79],
+      whenSec: 1.5,
+      durationSec: 0.5,
+      velocity: 90,
+      voice: 'melody',
+    });
+  });
+
   it('stop() halts the scheduler and silences both sinks', () => {
     const clock = fakeClock();
     const ticker = manualTicker();

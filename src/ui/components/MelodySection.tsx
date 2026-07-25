@@ -13,19 +13,24 @@ import {
   type MelodyLane as MelodyLaneData,
   type RelChord,
 } from '../../theory/index.ts';
-import { MelodyLane } from './MelodyLane.tsx';
+import { MelodyLane, type LaneSegment } from './MelodyLane.tsx';
 
 export interface MelodySectionProps {
   lane: MelodyLaneData;
   keyValue: Key;
-  slots: readonly (RelChord | null)[];
-  playingBar: number | null;
-  hoveredBar: number | null;
-  onHoverBar: (bar: number | null) => void;
+  /** The chord timeline: what sounds when, in beats. */
+  segments: readonly LaneSegment[];
+  /** Bars in the progression. The lane keeps its own even bar grid however
+   * the chords above it are cut. */
+  bars: number;
+  playingSlot: number | null;
+  hoveredSlot: number | null;
+  onHoverSlot: (slot: number | null) => void;
   surprise: number;
   onSurpriseChange: (value: number) => void;
   onChange: (lane: MelodyLaneData) => void;
   onAuditionPitch: (pitch: number) => void;
+  beatWidth: number;
 }
 
 const RESOLUTIONS: { value: 8 | 16; label: string }[] = [
@@ -36,21 +41,35 @@ const RESOLUTIONS: { value: 8 | 16; label: string }[] = [
 export function MelodySection({
   lane,
   keyValue,
-  slots,
-  playingBar,
-  hoveredBar,
-  onHoverBar,
+  segments,
+  bars,
+  playingSlot,
+  hoveredSlot,
+  onHoverSlot,
   surprise,
   onSurpriseChange,
   onChange,
   onAuditionPitch,
+  beatWidth,
 }: MelodySectionProps) {
-  const hasChords = slots.some((s) => s !== null);
+  const hasChords = segments.some((s) => s.chord !== null);
+
+  /** The chord sounding at a beat, and so at a lane step. The generator wants
+   * both views: one chord per bar to shape the phrase, and the real chord at
+   * each note for choosing its pitch. */
+  const chordAtBeat = (beat: number): RelChord | null => {
+    for (let i = segments.length - 1; i >= 0; i--) {
+      if (beat >= segments[i].start - 1e-9) return segments[i].chord;
+    }
+    return null;
+  };
+  const beatsPerStep = 4 / lane.stepsPerBar;
 
   const generate = () => {
     onChange(
       generateMelody({
-        slots,
+        slots: Array.from({ length: bars }, (_, bar) => chordAtBeat(bar * 4)),
+        chordAtStep: (step) => chordAtBeat(step * beatsPerStep),
         key: keyValue,
         stepsPerBar: lane.stepsPerBar,
         surprise,
@@ -108,19 +127,21 @@ export function MelodySection({
 
         <span className="tp-strip__hint" style={{ marginLeft: 'auto' }}>
           click to add · drag to move · drag the right edge to lengthen · click a note to delete ·
-          hover a bar to see its chord tones
+          hover a chord to see its tones
         </span>
       </div>
 
       <MelodyLane
         lane={lane}
         keyValue={keyValue}
-        slots={slots}
-        playingBar={playingBar}
-        hoveredBar={hoveredBar}
-        onHoverBar={onHoverBar}
+        segments={segments}
+        bars={bars}
+        playingSlot={playingSlot}
+        hoveredSlot={hoveredSlot}
+        onHoverSlot={onHoverSlot}
         onChange={onChange}
         onAuditionPitch={onAuditionPitch}
+        beatWidth={beatWidth}
       />
     </section>
   );

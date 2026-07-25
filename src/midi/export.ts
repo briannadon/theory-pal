@@ -31,12 +31,17 @@ interface RawNoteEvent {
 }
 
 export interface ExportOptions {
-  /** How each bar is played. Defaults to one sustained chord per bar, which
+  /** How each chord is played. Defaults to one sustained chord per slot, which
    * is what export has always written; pass the transport's live style to
    * export arpeggios instead. */
   style?: BarStyle;
-  /** Melody notes per bar, in beats from that bar's start (theory/pattern.ts). */
+  /** Melody notes per bar, in beats from that bar's start (theory/pattern.ts).
+   * Bars, not chord slots: the melody lane keeps its own even bar grid no
+   * matter how the chords above it are cut. */
   melody?: (NoteEvent[] | null)[];
+  /** How long each chord slot lasts, in beats. Indexed like `bars`; omit for
+   * the historical one-chord-per-bar timeline. */
+  slotBeats?: readonly number[];
 }
 
 // Whole-bar chords: the historical export behavior, and still the default.
@@ -68,15 +73,35 @@ export function exportMidiFile(bars: (AbsChord | null)[], bpm: number, opts?: Ex
   // Chords and melody both come through `renderBar`'s NoteEvent form, so the
   // exported file is the same material playback schedules — an arpeggio or a
   // lead line exports without a second code path here.
+  //
+  // The two parts sit on different grids and are collected against their own:
+  // chords on the slot timeline (each slot as long as `slotBeats` says, which
+  // is how a 3+1 bar exports as a 3-beat chord and a 1-beat one), melody on
+  // plain 4/4 bars.
   const style = opts?.style ?? SUSTAIN_STYLE;
-  const collect = (source: (barIndex: number) => NoteEvent[] | null): RawNoteEvent[] => {
+  const slotStartTicks: number[] = [];
+  let cursorBeats = 0;
+  for (let i = 0; i < bars.length; i++) {
+    slotStartTicks.push(Math.round(cursorBeats * TICKS_PER_BEAT));
+    cursorBeats += opts?.slotBeats?.[i] ?? BEATS_PER_BAR;
+  }
+  const totalTicks = Math.max(
+    Math.round(cursorBeats * TICKS_PER_BEAT),
+    (opts?.melody?.length ?? 0) * TICKS_PER_BAR,
+  );
+
+  const collect = (
+    count: number,
+    startTickOf: (index: number) => number,
+    source: (index: number) => NoteEvent[] | null,
+  ): RawNoteEvent[] => {
     const raw: RawNoteEvent[] = [];
-    for (let barIndex = 0; barIndex < bars.length; barIndex++) {
-      const events = source(barIndex);
+    for (let index = 0; index < count; index++) {
+      const events = source(index);
       if (!events) continue;
-      const barStart = barIndex * TICKS_PER_BAR;
+      const base = startTickOf(index);
       for (const ev of events) {
-        const startTick = barStart + Math.round(ev.startBeat * TICKS_PER_BEAT);
+        const startTick = base + Math.round(ev.startBeat * TICKS_PER_BEAT);
         const endTick = startTick + Math.round(ev.durationBeats * TICKS_PER_BEAT);
         raw.push({ tick: startTick, on: true, note: ev.note, velocity: ev.velocity });
         raw.push({ tick: endTick, on: false, note: ev.note, velocity: 0 });
@@ -89,11 +114,19 @@ export function exportMidiFile(bars: (AbsChord | null)[], bpm: number, opts?: Ex
     return raw.sort((a, b) => a.tick - b.tick || Number(a.on) - Number(b.on) || a.note - b.note);
   };
 
-  const chordEvents = collect((barIndex) => {
-    const notes = notesByBar.get(barIndex);
-    return notes ? renderBar({ notes }, style, BEATS_PER_BAR) : null;
-  });
-  const melodyEvents = collect((barIndex) => opts?.melody?.[barIndex] ?? null);
+  const chordEvents = collect(
+    bars.length,
+    (i) => slotStartTicks[i],
+    (i) => {
+      const notes = notesByBar.get(i);
+      return notes ? renderBar({ notes }, style, opts?.slotBeats?.[i] ?? BEATS_PER_BAR) : null;
+    },
+  );
+  const melodyEvents = collect(
+    opts?.melody?.length ?? 0,
+    (bar) => bar * TICKS_PER_BAR,
+    (bar) => opts?.melody?.[bar] ?? null,
+  );
 
   const meta: MidiEvent[] = [
     { deltaTime: 0, meta: true, type: 'setTempo', microsecondsPerBeat },
@@ -108,7 +141,6 @@ export function exportMidiFile(bars: (AbsChord | null)[], bpm: number, opts?: Ex
     },
   ];
 
-  const totalTicks = bars.length * TICKS_PER_BAR;
   const buildTrack = (
     head: MidiEvent[],
     events: RawNoteEvent[],

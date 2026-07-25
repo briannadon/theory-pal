@@ -34,22 +34,38 @@ import {
   type RelChord,
 } from '../../theory/index.ts';
 
+/** One chord slot on the timeline: what it is and when it sounds. Chords have
+ * their own lengths, so the lane can no longer assume one per bar — it asks
+ * which *slot* covers a given moment instead. */
+export interface LaneSegment {
+  chord: RelChord | null;
+  /** Beats from the start of the progression. */
+  start: number;
+  beats: number;
+}
+
 export interface MelodyLaneProps {
   lane: MelodyLaneData;
   keyValue: Key;
-  /** Chord per bar-slot, so each column knows what it is played against. */
-  slots: readonly (RelChord | null)[];
-  playingBar: number | null;
-  /** Bar whose chord the lane is currently resolving to, from either this
-   * component's own bar hover or a chord tile in the grid above. */
-  hoveredBar: number | null;
-  onHoverBar: (bar: number | null) => void;
+  /** The chord timeline, so each column knows what it is played against. */
+  segments: readonly LaneSegment[];
+  /** Bars in the progression; the lane's own grid stays even regardless of
+   * how the chords above it are cut. */
+  bars: number;
+  playingSlot: number | null;
+  /** Slot whose chord the lane is currently resolving to, from either this
+   * component's own hover or a chord tile in the grid above. */
+  hoveredSlot: number | null;
+  onHoverSlot: (slot: number | null) => void;
   onChange: (lane: MelodyLaneData) => void;
   onAuditionPitch: (pitch: number) => void;
+  /** Pixels per beat, shared with the progression grid so a chord tile sits
+   * directly over the melody steps it sounds against. */
+  beatWidth: number;
 }
 
 const ROW_H = 13;
-const STEP_W = { 8: 18, 16: 11 } as const;
+const BEATS_PER_BAR = 4;
 const RESIZE_GRIP_PX = 6;
 
 interface Cell {
@@ -67,31 +83,44 @@ type Drag =
 export function MelodyLane({
   lane,
   keyValue,
-  slots,
-  playingBar,
-  hoveredBar,
-  onHoverBar,
+  segments,
+  bars,
+  playingSlot,
+  hoveredSlot,
+  onHoverSlot,
   onChange,
   onAuditionPitch,
+  beatWidth,
 }: MelodyLaneProps) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag>(null);
 
-  const stepW = STEP_W[lane.stepsPerBar];
-  const totalSteps = slots.length * lane.stepsPerBar;
+  const beatsPerStep = BEATS_PER_BAR / lane.stepsPerBar;
+  const stepW = beatWidth * beatsPerStep;
+  const totalSteps = bars * lane.stepsPerBar;
+  const totalBeats = bars * BEATS_PER_BAR;
   const width = totalSteps * stepW;
   const height = MELODY_ROWS * ROW_H;
+
+  /** Which slot is sounding at a beat — the lane's link between its own even
+   * grid and the uneven chord timeline above it. */
+  const slotAtBeat = (beat: number): number | null => {
+    for (let i = segments.length - 1; i >= 0; i--) {
+      if (beat >= segments[i].start - 1e-9) return i;
+    }
+    return null;
+  };
 
   // Rows run high pitch at the top, so row 0 is the top of the lane.
   const pitchForRow = (row: number) => MELODY_ROWS - 1 - row;
   const rowForPitch = (pitch: number) => MELODY_ROWS - 1 - pitch;
 
-  const hoveredChord = hoveredBar !== null ? (slots[hoveredBar] ?? null) : null;
+  const hoveredChord = hoveredSlot !== null ? (segments[hoveredSlot]?.chord ?? null) : null;
   /** Which of the three hover tiers a row is in — chord tone, other scale
    * tone, or off-scale — as a class-name suffix shared by the lane rows and
    * the gutter keys, which use the same tiers under different block names. */
   const focusTier = (pitch: number): '' | 'lit' | 'scale' | 'dim' => {
-    if (hoveredBar === null) return '';
+    if (hoveredSlot === null) return '';
     const kind = melodyRowKind(pitch, hoveredChord, keyValue);
     if (kind === 'chord') return 'lit';
     return kind === 'scale' ? 'scale' : 'dim';
@@ -160,7 +189,7 @@ export function MelodyLane({
     const cell = pointToCell(e.clientX, e.clientY);
 
     if (!drag) {
-      onHoverBar(cell ? Math.floor(cell.step / lane.stepsPerBar) : null);
+      onHoverSlot(cell ? slotAtBeat(cell.step * beatsPerStep) : null);
       return;
     }
     if (drag.kind === 'erase') {
@@ -212,19 +241,20 @@ export function MelodyLane({
     setDrag(null);
   };
 
-  /** One row's background: a stop per bar, colored by that bar's chord. */
+  /** One row's background: a stop per chord slot, colored by that chord —
+   * so the color changes where the harmony changes, mid-bar or not. */
   const rowGradient = (pitch: number): string => {
     const stops: string[] = [];
-    slots.forEach((chord, bar) => {
-      const kind = melodyRowKind(pitch, chord, keyValue);
+    segments.forEach((segment) => {
+      const kind = melodyRowKind(pitch, segment.chord, keyValue);
       const color =
         kind === 'chord'
           ? 'var(--lane-chord)'
           : kind === 'scale'
             ? 'var(--lane-scale)'
             : 'var(--lane-off)';
-      const from = (bar / slots.length) * 100;
-      const to = ((bar + 1) / slots.length) * 100;
+      const from = (segment.start / totalBeats) * 100;
+      const to = (Math.min(totalBeats, segment.start + segment.beats) / totalBeats) * 100;
       stops.push(`${color} ${from}% ${to}%`);
     });
     return `linear-gradient(to right, ${stops.join(', ')})`;
@@ -246,7 +276,7 @@ export function MelodyLane({
       : null;
 
   return (
-    <div className="tp-lane" onPointerLeave={() => onHoverBar(null)}>
+    <div className="tp-lane" onPointerLeave={() => onHoverSlot(null)}>
       <div className="tp-lane__gutter" style={{ height }}>
         {Array.from({ length: MELODY_ROWS }, (_, row) => {
           const pitch = pitchForRow(row);
@@ -287,13 +317,21 @@ export function MelodyLane({
             );
           })}
 
-          {slots.map((_, bar) => (
+          {Array.from({ length: bars }, (_, bar) => (
             <div
               key={`bar-${bar}`}
-              className={`tp-lane__barline${playingBar === bar ? ' tp-lane__barline--playing' : ''}${
-                hoveredBar === bar ? ' tp-lane__barline--hovered' : ''
+              className="tp-lane__gridline"
+              style={{ left: bar * BEATS_PER_BAR * beatWidth }}
+            />
+          ))}
+
+          {segments.map((segment, i) => (
+            <div
+              key={`seg-${i}`}
+              className={`tp-lane__segment${playingSlot === i ? ' tp-lane__segment--playing' : ''}${
+                hoveredSlot === i ? ' tp-lane__segment--hovered' : ''
               }`}
-              style={{ left: bar * lane.stepsPerBar * stepW, width: lane.stepsPerBar * stepW }}
+              style={{ left: segment.start * beatWidth, width: segment.beats * beatWidth }}
             />
           ))}
 

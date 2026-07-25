@@ -42,6 +42,8 @@ export {
   melodyPitchToMidi,
   melodyRowKind,
   melodyToBars,
+  melodyToEvents,
+  melodyToSegments,
   setMelodyResolution,
   addMelodyNote,
   removeMelodyNote,

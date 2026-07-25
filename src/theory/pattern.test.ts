@@ -58,6 +58,22 @@ describe('renderBar', () => {
     expect(first.durationBeats).toBe(0.25);
   });
 
+  it('fills a short span without spilling past its end', () => {
+    // A one-beat chord: struck once, and its tail cannot run into whatever
+    // chord takes over on the next beat.
+    expect(renderBar(cMaj, { pattern: 'block', rate: '1/4' }, 1)).toHaveLength(3);
+    expect(renderBar(cMaj, { pattern: 'sustain', rate: '1/4' }, 1)[0].durationBeats).toBe(1);
+    // Half a beat is shorter than the gate, so the gate gives way.
+    expect(renderBar(cMaj, { pattern: 'block', rate: '1/4' }, 0.5)[0].durationBeats).toBe(0.425);
+  });
+
+  it('arpeggiates uneven spans, and still sounds one note in a span shorter than a step', () => {
+    expect(starts({ pattern: 'up', rate: '1/8' }, cMaj, 3)).toEqual([0, 0.5, 1, 1.5, 2, 2.5]);
+    const stab = renderBar(cMaj, { pattern: 'up', rate: '1/4' }, 0.5);
+    expect(stab).toHaveLength(1);
+    expect(stab[0].durationBeats).toBe(0.425);
+  });
+
   it('an empty voicing produces nothing rather than throwing', () => {
     expect(renderBar({ notes: [] }, { pattern: 'up', rate: '1/8' }, 4)).toEqual([]);
   });

@@ -46,12 +46,14 @@ const DEFAULT_TICK_MS = 25;
 const DEFAULT_LOOKAHEAD_SEC = 0.1;
 
 /**
- * Schedules a fixed-length sequence of `stepCount` steps, `stepDurationSec`
- * apart, against `clock`. `onStep(index, time)` fires once per step, in
- * order, as soon as its target time enters the lookahead window (so it may
- * fire slightly before `time`, never after). When `loop` is true the index
- * wraps back to 0 indefinitely and the absolute timeline keeps advancing;
- * otherwise the scheduler stops itself after the last step.
+ * Schedules a fixed-length sequence of `stepCount` steps against `clock`.
+ * `stepDurationSec` is either one duration for every step or, since chords
+ * carry their own lengths, a per-step array (`stepDurationSec[i]` is how long
+ * step `i` lasts). `onStep(index, time)` fires once per step, in order, as
+ * soon as its target time enters the lookahead window (so it may fire slightly
+ * before `time`, never after). When `loop` is true the index wraps back to 0
+ * indefinitely and the absolute timeline keeps advancing; otherwise the
+ * scheduler stops itself after the last step.
  *
  * Note that `onStep` firing "early" (within the lookahead window) is by
  * design: the callback's job is to *schedule* the step precisely for `time`
@@ -62,7 +64,7 @@ export class StepScheduler {
   private readonly clock: Clock;
   private readonly ticker: Ticker;
   private readonly stepCount: number;
-  private readonly stepDurationSec: number;
+  private readonly stepDurations: number[] | number;
   private readonly onStep: (index: number, time: number) => void;
 
   private handle: unknown = null;
@@ -78,14 +80,16 @@ export class StepScheduler {
     clock: Clock,
     ticker: Ticker,
     stepCount: number,
-    stepDurationSec: number,
+    stepDurationSec: number | readonly number[],
     onStep: (index: number, time: number) => void,
     options?: StepSchedulerOptions,
   ) {
     this.clock = clock;
     this.ticker = ticker;
     this.stepCount = stepCount;
-    this.stepDurationSec = stepDurationSec;
+    this.stepDurations = Array.isArray(stepDurationSec)
+      ? (stepDurationSec as number[]).slice()
+      : (stepDurationSec as number);
     this.onStep = onStep;
     this.tickMs = options?.tickMs ?? DEFAULT_TICK_MS;
     this.lookaheadSec = options?.lookaheadSec ?? DEFAULT_LOOKAHEAD_SEC;
@@ -130,6 +134,11 @@ export class StepScheduler {
     }
   }
 
+  private durationOf(index: number): number {
+    if (typeof this.stepDurations === 'number') return this.stepDurations;
+    return this.stepDurations[index] ?? 0;
+  }
+
   private tick(): void {
     if (!this.active) return;
     const now = this.clock.now();
@@ -139,7 +148,7 @@ export class StepScheduler {
       const time = this.nextStepTime;
       this.onStep(index, time);
       this.stepIndex++;
-      this.nextStepTime += this.stepDurationSec;
+      this.nextStepTime += this.durationOf(index);
       if (this.stepIndex >= this.stepCount && this.loop) {
         this.stepIndex = 0;
       }

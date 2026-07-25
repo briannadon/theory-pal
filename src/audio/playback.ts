@@ -25,12 +25,16 @@ import type { AudioEngine, Voice } from './engine.ts';
 import { StepScheduler, realTimeTicker, type Clock, type Ticker } from './scheduler.ts';
 
 export interface PlayProgressionOptions {
-  /** One voiced chord per bar-slot; `null` is a silent bar. */
+  /** One voiced chord per slot; `null` is a silent slot. */
   chords: (VoicedChord | null)[];
   bpm: number;
   loop?: boolean;
-  /** Beats per bar. Default 4 (SPEC.md v1: one chord per 4/4 bar). */
+  /** Beats per bar. Default 4 (SPEC.md v1: 4/4). */
   beatsPerBar?: number;
+  /** How long each slot lasts, in beats. Chords carry their own rhythm, so a
+   * slot is a span of time rather than necessarily a whole bar. Indexed like
+   * `chords`; omit for the historical one-chord-per-bar behavior. */
+  slotBeats?: readonly number[];
   velocity?: number;
   /** Internal piano sink. Omit, or toggle off via `AudioEngine.setEnabled(false)`,
    * for MIDI-out-only playback. */
@@ -41,8 +45,8 @@ export interface PlayProgressionOptions {
   /** How each bar's chord is played: block chords (default) or an arpeggio.
    * See theory/pattern.ts. */
   style?: BarStyle;
-  /** Melody notes per bar-slot, already in beats-from-bar-start form. Indexed
-   * like `chords`; a missing or null entry is a bar with no melody. Scheduled
+  /** Melody notes per slot, already in beats-from-slot-start form. Indexed
+   * like `chords`; a missing or null entry is a slot with no melody. Scheduled
    * alongside the chord from the same timeline, so the lead can never drift
    * against the accompaniment. */
   melody?: (NoteEvent[] | null)[];
@@ -71,7 +75,12 @@ const DEFAULT_VELOCITY = 100;
 
 export function playProgression(opts: PlayProgressionOptions): Playback {
   const beatsPerBar = opts.beatsPerBar ?? DEFAULT_BEATS_PER_BAR;
-  const stepDurationSec = (60 / opts.bpm) * beatsPerBar;
+  const beatDurationSec = 60 / opts.bpm;
+  // A slot's length is its own; the scheduler takes the whole list so a
+  // 3-beat chord followed by a 1-beat one advances the timeline unevenly
+  // without any downstream code tracking where in the bar it is.
+  const slotBeats = opts.chords.map((_, i) => opts.slotBeats?.[i] ?? beatsPerBar);
+  const stepDurationSec = slotBeats.map((beats) => beatDurationSec * beats);
   const velocity = opts.velocity ?? DEFAULT_VELOCITY;
   const wallNow = opts.now ?? (() => performance.now());
   const style: BarStyle = { velocity, ...(opts.style ?? DEFAULT_BAR_STYLE) };
@@ -95,9 +104,8 @@ export function playProgression(opts: PlayProgressionOptions): Playback {
     stepDurationSec,
     (index, time) => {
       opts.onStep?.(index, time);
-      const beatDurationSec = 60 / opts.bpm;
 
-      // Everything audible in this bar — the chord under the current playing
+      // Everything audible in this slot — the chord under the current playing
       // style, plus any melody notes written for it — is one flat list of
       // NoteEvents, so both sinks schedule from identical material and a new
       // style never needs a second scheduling path.
@@ -105,7 +113,7 @@ export function playProgression(opts: PlayProgressionOptions): Playback {
       const sources: { events: NoteEvent[]; voice: Voice; channel: number }[] = [];
       if (chord && chord.notes.length > 0) {
         sources.push({
-          events: renderBar(chord, style, beatsPerBar, opts.rng),
+          events: renderBar(chord, style, slotBeats[index], opts.rng),
           voice: 'chords',
           channel: MIDI_CHANNEL.chords,
         });

@@ -197,6 +197,54 @@ describe('StepScheduler', () => {
     expect(ticker.startCount).toBe(0);
   });
 
+  it('advances by each step’s own duration when given a list', () => {
+    const clock = fakeClock();
+    const ticker = manualTicker();
+    const events: Array<[number, number]> = [];
+    // A 3-beat chord, its 1-beat pickup, then a whole bar, at 1s/beat.
+    const scheduler = new StepScheduler(
+      clock,
+      ticker,
+      3,
+      [3, 1, 4],
+      (i, t) => events.push([i, t]),
+      { lookaheadSec: 0.1 },
+    );
+
+    scheduler.start();
+    for (const t of [0, 3, 4]) {
+      clock.set(t);
+      ticker.tick();
+    }
+    expect(events).toEqual([
+      [0, 0],
+      [1, 3],
+      [2, 4],
+    ]);
+  });
+
+  it('loops an uneven sequence on its own total length', () => {
+    const clock = fakeClock();
+    const ticker = manualTicker();
+    const events: Array<[number, number]> = [];
+    const scheduler = new StepScheduler(clock, ticker, 2, [3, 1], (i, t) => events.push([i, t]), {
+      lookaheadSec: 0.1,
+      loop: true,
+    });
+
+    scheduler.start();
+    for (const t of [0, 3, 4, 7]) {
+      clock.set(t);
+      ticker.tick();
+    }
+    expect(events).toEqual([
+      [0, 0],
+      [1, 3],
+      [0, 4],
+      [1, 7],
+    ]);
+  });
+
   it('start() is idempotent while already running', () => {
     const clock = fakeClock();
     const ticker = manualTicker();
