@@ -1,6 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Key, RelChord } from '../../theory/index.ts';
 import { modifierState, toggleModifier } from '../logic/chordMods.ts';
 import { beatsLabel, BEATS_PER_BAR, MIN_SLOT_BEATS, type Division } from '../logic/grid.ts';
@@ -32,6 +33,12 @@ export interface GridSlotProps {
   /** What the resize grip snaps to, in beats. */
   division: Division;
   onResize?: (beats: number) => void;
+  /** Move this chord's downbeat, keeping its end where it is — the keyboard
+   * half of the left grip. Filled slots only: an empty span is the gap
+   * between chords, and has no edges of its own to move. */
+  onSetStart?: (start: number) => void;
+  /** Hand a left-edge pointer drag to the grid, which tracks it (see below). */
+  onStartEdgeDrag?: (clientX: number) => void;
 }
 
 /** Below these widths the tile cannot hold its text, so it sheds it rather
@@ -57,38 +64,63 @@ export function GridSlot({
   beatWidth,
   division,
   onResize,
+  onSetStart,
+  onStartEdgeDrag,
 }: GridSlotProps) {
   const [modsOpen, setModsOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const [shift, setShift] = useState(0);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const dragStart = useRef<{ x: number; beats: number } | null>(null);
 
-  // The panel is centered on its button, which pushes it off-screen for slots
-  // near either edge of the grid — the leftmost tile clipped its first toggle.
-  // Measure once on open and slide it back inside the viewport.
+  // The grid scrolls horizontally, and a scroll container clips both axes: a
+  // panel anchored inside a tile is cut off at the scroller's bottom edge,
+  // which is where the melody lane starts. So the panel lives on the body and
+  // is positioned against the button's viewport rect — centered on it, then
+  // clamped inside the viewport (edge tiles used to lose their first toggle),
+  // and flipped above the button when there's no room below.
+  const place = useCallback(() => {
+    const btn = btnRef.current;
+    const panel = panelRef.current;
+    if (!btn || !panel) return;
+    const b = btn.getBoundingClientRect();
+    const p = panel.getBoundingClientRect();
+    const margin = 8;
+    const gap = 5;
+    const maxLeft = Math.max(margin, window.innerWidth - margin - p.width);
+    const left = Math.min(Math.max(margin, b.left + b.width / 2 - p.width / 2), maxLeft);
+    const below = b.bottom + gap;
+    const top = below + p.height > window.innerHeight - margin ? b.top - gap - p.height : below;
+    setPos({ left, top });
+  }, []);
+
   useLayoutEffect(() => {
     if (!modsOpen) {
-      setShift(0);
+      setPos(null);
       return;
     }
-    const el = panelRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const margin = 8;
-    if (rect.left < margin) setShift(margin - rect.left);
-    else if (rect.right > window.innerWidth - margin) {
-      setShift(window.innerWidth - margin - rect.right);
-    }
-  }, [modsOpen]);
+    place();
+    // Scrolling the grid (or the page) moves the button out from under the
+    // panel, so the panel has to follow it.
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [modsOpen, place]);
 
   // Click anywhere else — including another slot's button — closes this one.
   // Pointerdown rather than click so the popover is gone before whatever was
-  // clicked reacts, and Escape for the keyboard.
+  // clicked reacts, and Escape for the keyboard. The panel is portalled, so it
+  // is not inside popoverRef and has to be tested separately.
   useEffect(() => {
     if (!modsOpen) return;
     const onPointerDown = (e: PointerEvent) => {
-      if (!popoverRef.current?.contains(e.target as Node)) setModsOpen(false);
+      const target = e.target as Node;
+      if (popoverRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setModsOpen(false);
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setModsOpen(false);
@@ -167,6 +199,32 @@ export function GridSlot({
     e.preventDefault();
   };
 
+  // The left grip is the same gesture against the other edge: it sets where
+  // the chord *starts*, holding its end still, which is how a chord left
+  // stranded after a gap gets pulled back onto the previous chord's downbeat
+  // without re-dragging everything after it.
+  //
+  // Its pointer drag is run by the grid rather than here. Moving this edge
+  // splices slots out in front of it, and slot keys are positional, so *this*
+  // tile is unmounted the moment the gap it is closing disappears — a drag
+  // owned by the tile would die mid-gesture, right at the beat the user was
+  // aiming for. The grid outlives that. Keyboard nudges are still local:
+  // between two keypresses there is no gesture to lose.
+  const handleStartDown = (e: React.PointerEvent) => {
+    if (!onStartEdgeDrag) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onStartEdgeDrag(e.clientX);
+  };
+
+  const handleStartKey = (e: React.KeyboardEvent) => {
+    if (!onSetStart) return;
+    if (e.key === 'ArrowLeft') onSetStart(Math.max(0, start - division));
+    else if (e.key === 'ArrowRight') onSetStart(start + division);
+    else return;
+    e.preventDefault();
+  };
+
   const sizeClass = width < TINY_PX ? ' grid-slot--tiny' : width < NARROW_PX ? ' grid-slot--narrow' : '';
 
   return (
@@ -206,6 +264,7 @@ export function GridSlot({
         <div className="grid-slot__mods" ref={popoverRef}>
           <button
             type="button"
+            ref={btnRef}
             className="grid-slot__mods-btn"
             aria-expanded={modsOpen}
             aria-label={`Modifiers for the chord at bar ${position}`}
@@ -217,27 +276,44 @@ export function GridSlot({
           >
             mods
           </button>
-          {modsOpen && (
-            <div
-              className="grid-slot__popover"
-              ref={panelRef}
-              style={{ transform: `translateX(calc(-50% + ${shift}px))` }}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              <ModifierBar
-                value={modifierState(chord)}
-                onToggle={(modifier: ChordModifier) =>
-                  onModifyChord(toggleModifier(chord, keyValue, modifier))
-                }
-                ariaLabel={`Modifiers for the chord at bar ${position}`}
-              />
-            </div>
-          )}
+          {modsOpen &&
+            createPortal(
+              <div
+                className="grid-slot__popover"
+                ref={panelRef}
+                style={{
+                  left: pos?.left ?? 0,
+                  top: pos?.top ?? 0,
+                  // Hidden for the one layout pass that measures it.
+                  visibility: pos ? 'visible' : 'hidden',
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <ModifierBar
+                  value={modifierState(chord)}
+                  onToggle={(modifier: ChordModifier) =>
+                    onModifyChord(toggleModifier(chord, keyValue, modifier))
+                  }
+                  ariaLabel={`Modifiers for the chord at bar ${position}`}
+                />
+              </div>,
+              document.body,
+            )}
         </div>
       )}
       {/* The tile's address is the ruler's job and its own place on the
           timeline; what it shows here is the one number the grip is setting. */}
       <span className="grid-slot__beats">{beatsLabel(beats)}</span>
+      {chord && (onSetStart || onStartEdgeDrag) && (
+        <button
+          type="button"
+          className="grid-slot__grip grid-slot__grip--start"
+          aria-label={`Start of the chord at bar ${position}. Arrow keys to move it.`}
+          onPointerDown={handleStartDown}
+          onKeyDown={handleStartKey}
+          onClick={(e) => e.stopPropagation()}
+        />
+      )}
       {onResize && (
         <button
           type="button"

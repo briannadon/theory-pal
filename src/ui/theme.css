@@ -879,14 +879,13 @@
   background: var(--bg-3);
 }
 
+/* Portalled to the body and placed against the button's viewport rect (see
+   GridSlot): the grid is a horizontal scroller, which clips its own overflow
+   on both axes, and a panel anchored inside a tile was cut off where the
+   melody lane begins. `left`/`top` are set inline. */
 .grid-slot__popover {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 5px);
-  left: 50%;
-  /* transform is set inline: centered, then nudged back inside the viewport
-     for slots near an edge (see GridSlot). */
-  transform: translateX(-50%);
+  position: fixed;
+  z-index: 40; /* over the transport bar, under the loading overlay */
   white-space: nowrap;
   padding: 5px;
   background: var(--bg-2);
@@ -926,6 +925,14 @@
   cursor: ew-resize;
   border-radius: 0 var(--radius) var(--radius) 0;
   touch-action: none;
+}
+
+/* Its mirror on the left edge, which moves the chord's downbeat instead of its
+   end — the gesture for pulling a chord back onto the one before it. */
+.grid-slot__grip--start {
+  right: auto;
+  left: 0;
+  border-radius: var(--radius) 0 0 var(--radius);
 }
 
 .grid-slot__grip:hover,

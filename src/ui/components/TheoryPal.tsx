@@ -42,6 +42,7 @@ import {
   resizeGrid,
   resizeSlot,
   setSlot,
+  setSlotStart,
   slotStarts,
   type Division,
   type GridSize,
@@ -321,6 +322,9 @@ export function TheoryPal() {
             onHoverSlot={setHoveredSlot}
             onResizeSlot={(idx: number, beats: number) =>
               setGrid((g) => resizeSlot(g, idx, beats))
+            }
+            onSetSlotStart={(idx: number, start: number) =>
+              setGrid((g) => setSlotStart(g, idx, start))
             }
             division={division}
             onDivisionChange={setDivision}

@@ -79,6 +79,20 @@ export function slotIndexAtBeat(state: GridState, beat: number): number {
   return -1;
 }
 
+/** The slot whose right edge lands exactly on `endBeat`, or -1. Indices shift
+ * under a left-edge drag — every slot the edge swallows is spliced out from in
+ * front of it — but the edge being held still doesn't, so that is what the
+ * drag holds onto instead of an index. */
+export function slotIndexEndingAt(state: GridState, endBeat: number): number {
+  const target = quantize(endBeat);
+  let at = 0;
+  for (let i = 0; i < state.slots.length; i++) {
+    at = quantize(at + state.slots[i].beats);
+    if (at === target) return i;
+  }
+  return -1;
+}
+
 /** The chord sounding at `beat` — what the melody lane and its generator ask
  * when they need to know what a given moment is played against. */
 export function chordAtBeat(state: GridState, beat: number): RelChord | null {
@@ -160,6 +174,54 @@ export function resizeSlot(state: GridState, index: number, beats: number): Grid
       slots[i] = { ...slots[i], beats: left };
       i++;
     }
+  }
+  return { ...state, slots };
+}
+
+/**
+ * Move slot `index`'s left edge to `start` (beats from the beginning of the
+ * progression), holding its right edge still — the mirror of `resizeSlot`,
+ * and the only way to give a chord an earlier downbeat without re-dragging
+ * every tile after it.
+ *
+ * Dragging the edge earlier eats backwards through whatever is behind it,
+ * empty space first as a matter of course and then into the previous chord,
+ * dropping any slot it swallows whole. Dragging it later leaves empty space
+ * in front of the slot, merged into the preceding gap when there already is
+ * one so repeated drags don't shed slivers. Either way the timeline stays
+ * exactly `size` bars long.
+ */
+export function setSlotStart(state: GridState, index: number, start: number): GridState {
+  if (index < 0 || index >= state.slots.length) return state;
+  const slots = state.slots.slice();
+  const current = slots[index];
+
+  const before = slots.slice(0, index).reduce((sum, s) => sum + s.beats, 0);
+  const end = before + current.beats;
+  const target = Math.max(0, Math.min(quantize(start), end - MIN_SLOT_BEATS));
+  const beats = quantize(end - target);
+  const delta = quantize(beats - current.beats);
+  if (delta === 0) return state;
+
+  slots[index] = { ...current, beats };
+
+  if (delta < 0) {
+    const freed = -delta;
+    const prev = slots[index - 1];
+    if (prev && prev.chord === null) slots[index - 1] = { ...prev, beats: prev.beats + freed };
+    else slots.splice(index, 0, emptySlot(freed));
+    return { ...state, slots };
+  }
+
+  let owed = delta;
+  let i = index - 1;
+  while (owed > 0 && i >= 0) {
+    const taken = Math.min(owed, slots[i].beats);
+    const left = quantize(slots[i].beats - taken);
+    owed = quantize(owed - taken);
+    if (left === 0) slots.splice(i, 1);
+    else slots[i] = { ...slots[i], beats: left };
+    i--;
   }
   return { ...state, slots };
 }

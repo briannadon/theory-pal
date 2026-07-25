@@ -7,6 +7,7 @@
 // no longer mark them — that is the whole point of letting a chord be any
 // length, including one that runs across a barline.
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
+import { useEffect, useState } from 'react';
 import {
   chordName,
   isDiatonic,
@@ -19,6 +20,7 @@ import {
   BEATS_PER_BAR,
   DIVISIONS,
   slotId,
+  slotIndexEndingAt,
   slotStarts,
   totalBeats,
   type Division,
@@ -39,6 +41,7 @@ export interface GridContainerProps {
   onModifySlot?: (index: number, chord: RelChord) => void;
   onHoverSlot?: (index: number | null) => void;
   onResizeSlot?: (index: number, beats: number) => void;
+  onSetSlotStart?: (index: number, start: number) => void;
   /** What a dragged chord edge snaps to. */
   division: Division;
   onDivisionChange: (division: Division) => void;
@@ -61,6 +64,7 @@ export function GridContainer({
   onModifySlot,
   onHoverSlot,
   onResizeSlot,
+  onSetSlotStart,
   division,
   onDivisionChange,
   beatWidth,
@@ -70,6 +74,34 @@ export function GridContainer({
   const starts = slotStarts(state);
   const beats = totalBeats(state);
   const width = beats * beatWidth;
+
+  // A left-edge drag, tracked here rather than in the tile that started it:
+  // moving that edge earlier splices out the slots it swallows, which renumbers
+  // every tile after them, and slot keys are positional — the tile under the
+  // pointer is unmounted exactly when the gap closes. The grid stays. What the
+  // drag holds onto is the edge that is *not* moving, the chord's end, so the
+  // slot can be found again after each re-cut.
+  const [edgeDrag, setEdgeDrag] = useState<{ end: number; start: number; x: number } | null>(null);
+
+  useEffect(() => {
+    if (!edgeDrag || !onSetSlotStart) return;
+    const onMove = (e: PointerEvent) => {
+      const index = slotIndexEndingAt(state, edgeDrag.end);
+      if (index < 0) return;
+      const raw = edgeDrag.start + (e.clientX - edgeDrag.x) / beatWidth;
+      const snapped = Math.max(0, Math.round(raw / division) * division);
+      if (snapped !== slotStarts(state)[index]) onSetSlotStart(index, snapped);
+    };
+    const onUp = () => setEdgeDrag(null);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, [edgeDrag, state, beatWidth, division, onSetSlotStart]);
 
   return (
     <section className="tp-grid">
@@ -101,7 +133,10 @@ export function GridContainer({
             </button>
           ))}
         </div>
-        <span className="tp-strip__hint">drag a tile’s right edge to set how long its chord lasts</span>
+        <span className="tp-strip__hint">
+          drag a tile’s right edge to set how long its chord lasts, its left edge to move where
+          it starts
+        </span>
         <button
           type="button"
           className="tp-btn"
@@ -172,6 +207,17 @@ export function GridContainer({
                     beatWidth={beatWidth}
                     division={division}
                     onResize={onResizeSlot ? (next) => onResizeSlot(i, next) : undefined}
+                    onSetStart={onSetSlotStart ? (next) => onSetSlotStart(i, next) : undefined}
+                    onStartEdgeDrag={
+                      onSetSlotStart
+                        ? (clientX) =>
+                            setEdgeDrag({
+                              end: starts[i] + slot.beats,
+                              start: starts[i],
+                              x: clientX,
+                            })
+                        : undefined
+                    }
                   />
                 );
               })}

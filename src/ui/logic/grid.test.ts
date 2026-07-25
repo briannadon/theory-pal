@@ -11,8 +11,10 @@ import {
   resizeGrid,
   resizeSlot,
   setSlot,
+  setSlotStart,
   slotId,
   slotIndexAtBeat,
+  slotIndexEndingAt,
   slotStarts,
   splitSlot,
   totalBeats,
@@ -144,6 +146,109 @@ describe('resizeSlot', () => {
     const g = setSlot(createGrid(4), 0, I);
     expect(resizeSlot(g, 0, 4)).toBe(g);
     expect(resizeSlot(g, 9, 2)).toBe(g);
+  });
+});
+
+describe('setSlotStart', () => {
+  it('closes the gap in front of a chord, holding its right edge still', () => {
+    let g = createGrid(4);
+    g = setSlot(g, 0, I);
+    g = resizeSlot(g, 0, 2); // I for 2 beats, the rest of the timeline empty
+    g = splitSlot(g, 1, 2); // 2 beats of gap, then the slot the chord lands in
+    g = setSlot(g, 2, V); // V starts at beat 4, two beats after I ends
+    g = setSlotStart(g, 2, 2);
+    expect(shape(g)).toEqual([
+      [I, 2],
+      [V, 6],
+      [null, 4],
+      [null, 4],
+    ]);
+    expect(sum(g)).toBe(16);
+  });
+
+  it('eats into the previous chord once the gap is used up', () => {
+    let g = createGrid(4);
+    g = setSlot(g, 0, I);
+    g = setSlot(g, 1, V);
+    g = setSlotStart(g, 1, 3);
+    expect(shape(g)).toEqual([
+      [I, 3],
+      [V, 5],
+      [null, 4],
+      [null, 4],
+    ]);
+    expect(sum(g)).toBe(16);
+  });
+
+  it('consumes slots it swallows whole', () => {
+    let g = createGrid(4);
+    g = setSlot(g, 0, I);
+    g = setSlot(g, 1, IV);
+    g = setSlot(g, 2, V);
+    g = setSlotStart(g, 2, 2);
+    expect(shape(g)).toEqual([
+      [I, 2],
+      [V, 10],
+      [null, 4],
+    ]);
+    expect(sum(g)).toBe(16);
+  });
+
+  it('cannot start before the beginning of the timeline', () => {
+    let g = createGrid(4);
+    g = setSlot(g, 1, V);
+    g = setSlotStart(g, 1, -99);
+    expect(shape(g)).toEqual([
+      [V, 8],
+      [null, 4],
+      [null, 4],
+    ]);
+    expect(sum(g)).toBe(16);
+  });
+
+  it('leaves empty space in front when the edge moves later', () => {
+    let g = createGrid(4);
+    g = setSlot(g, 0, I);
+    g = setSlot(g, 1, V);
+    g = setSlotStart(g, 1, 6);
+    expect(shape(g)).toEqual([
+      [I, 4],
+      [null, 2],
+      [V, 2],
+      [null, 4],
+      [null, 4],
+    ]);
+    expect(sum(g)).toBe(16);
+  });
+
+  it('extends the preceding empty slot rather than adding another', () => {
+    let g = createGrid(4);
+    g = setSlot(g, 1, V);
+    g = setSlotStart(g, 1, 5);
+    g = setSlotStart(g, 1, 6);
+    expect(shape(g)).toEqual([
+      [null, 6],
+      [V, 2],
+      [null, 4],
+      [null, 4],
+    ]);
+    expect(sum(g)).toBe(16);
+  });
+
+  it('snaps to sixteenths and keeps at least one of them', () => {
+    let g = createGrid(4);
+    g = setSlot(g, 1, V);
+    g = setSlotStart(g, 1, 4.3);
+    expect(slotStarts(g)[1]).toBe(4.25);
+    g = setSlotStart(g, 1, 99);
+    expect(g.slots[1].beats).toBe(0.25);
+    expect(sum(g)).toBe(16);
+  });
+
+  it('is a no-op when the edge does not move', () => {
+    const g = setSlot(createGrid(4), 1, V);
+    expect(setSlotStart(g, 1, 4)).toBe(g);
+    expect(setSlotStart(g, 9, 2)).toBe(g);
   });
 });
 
@@ -279,6 +384,35 @@ describe('timeline queries', () => {
     expect(chordAtBeat(g, 3)).toBe(V);
     expect(slotIndexAtBeat(g, 3.5)).toBe(1);
     expect(slotIndexAtBeat(g, 16)).toBe(-1);
+  });
+});
+
+describe('slotIndexEndingAt', () => {
+  it('finds the slot whose right edge lands on a beat, and only that one', () => {
+    let g = createGrid(4);
+    g = setSlot(g, 0, I);
+    g = setSlot(g, 1, V);
+    g = resizeSlot(g, 0, 3); // [I 3][gap 1][V 4][…]
+    expect(slotIndexEndingAt(g, 3)).toBe(0);
+    expect(slotIndexEndingAt(g, 4)).toBe(1);
+    expect(slotIndexEndingAt(g, 8)).toBe(2);
+    expect(slotIndexEndingAt(g, 2)).toBe(-1);
+    expect(slotIndexEndingAt(g, 99)).toBe(-1);
+  });
+
+  it('holds a chord across the re-cut its own left-edge drag causes', () => {
+    let g = createGrid(4);
+    g = setSlot(g, 1, V);
+    const end = 8; // V ends at beat 8 and stays there while its start moves
+    g = setSlotStart(g, slotIndexEndingAt(g, end), 2); // eats half the gap
+    expect(slotIndexEndingAt(g, end)).toBe(1);
+    g = setSlotStart(g, slotIndexEndingAt(g, end), 0); // and then the rest of it
+    expect(slotIndexEndingAt(g, end)).toBe(0); // the slot in front is gone
+    expect(shape(g)).toEqual([
+      [V, 8],
+      [null, 4],
+      [null, 4],
+    ]);
   });
 });
 
