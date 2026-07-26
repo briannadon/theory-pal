@@ -948,6 +948,57 @@
   background: var(--bg-3);
 }
 
+/* An empty slot the user has clicked, and the one the suggestion strip is
+   ranking for. Selection is quiet (a dashed border going solid); the targeted
+   slot is loud, because the strip above it has changed what it means and the
+   only thing tying the two together is that they light up as a pair. */
+.grid-slot--selected .grid-slot__body {
+  border-style: solid;
+  border-color: var(--ink-faint);
+}
+
+.grid-slot--targeted .grid-slot__body {
+  border-style: solid;
+  border-color: var(--accent-diatonic);
+  background: color-mix(in srgb, var(--accent-diatonic) 12%, transparent);
+}
+
+.grid-slot__suggest-btn {
+  all: unset;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: var(--bg-3);
+  border: 1px solid var(--accent-diatonic);
+  border-radius: 4px;
+  padding: 3px 4px;
+  /* The tile is a duration wide, so this can be narrower than its own label.
+     Clipping beats wrapping, which would push the tile's height around. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grid-slot__suggest-btn:hover {
+  background: var(--accent-diatonic);
+  color: var(--bg-0);
+}
+
+/* Reverting to the default is not a destructive action, so it sits quietly at
+   the end of the header rather than competing with the chords below it. Needs
+   the extra class to outrank `.tp-btn`'s `all: unset`, which is declared later
+   in this file and would otherwise reset the margin. */
+.tp-strip__header .tp-strip__revert {
+  margin-left: auto;
+  font-size: 11px;
+}
+
 /* Portalled to the body and placed against the button's viewport rect (see
    GridSlot): the grid is a horizontal scroller, which clips its own overflow
    on both axes, and a panel anchored inside a tile was cut off where the

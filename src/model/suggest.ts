@@ -3,6 +3,7 @@
 // implements.
 import { parseStateKey, isDiatonic, stateKey, type Key, type RelChord } from '../theory/index.ts';
 import {
+  BLEND_EXPONENT_BACKWARD,
   BLEND_EXPONENT_CORPUS,
   BLEND_EXPONENT_PRIOR,
   CONFIDENCE_HALF_COUNT,
@@ -54,6 +55,43 @@ function corpusCountsForContext(
   return null;
 }
 
+/**
+ * `P(following | ...context, candidate)`: the probability that the candidate,
+ * if placed, is followed by the chord that already sits after the slot. This
+ * is the same corpus/prior blend the forward term uses, asked in the other
+ * direction, and it needs no reversed model: `corpusCountsForContext` called
+ * with the context that *would* exist if the candidate were placed returns the
+ * distribution over what comes next after it, at whatever order the evidence
+ * supports. `theoryPrior` reads only the last chord of the context it is
+ * given, so it answers the matching question for the prior.
+ */
+function backwardProbability(
+  modeModel: ModeModel | undefined,
+  key: Key,
+  context: RelChord[],
+  candidate: RelChord,
+  followingKey: string,
+): { p: number; fromCorpus: boolean } {
+  const hypothetical = [...context, candidate];
+
+  const priorRaw = theoryPrior(key, hypothetical);
+  let priorTotal = 0;
+  for (const w of priorRaw.values()) priorTotal += w;
+  const priorP = priorTotal > 0 ? (priorRaw.get(followingKey) ?? 0) / priorTotal : 0;
+
+  const corpus = modeModel ? corpusCountsForContext(modeModel, hypothetical) : null;
+  if (!corpus) return { p: priorP, fromCorpus: false };
+
+  // Smoothing mass is spread over the next-states actually observed, exactly
+  // as in the forward path, so a transition the corpus never saw scores 0
+  // here and leans entirely on the prior via the confidence blend below.
+  const count = corpus.counts[followingKey] ?? 0;
+  const denom = corpus.total + CORPUS_SMOOTHING_ALPHA * Object.keys(corpus.counts).length;
+  const corpusP = count > 0 && denom > 0 ? (count + CORPUS_SMOOTHING_ALPHA) / denom : 0;
+  const confidence = corpus.total / (corpus.total + CONFIDENCE_HALF_COUNT);
+  return { p: confidence * corpusP + (1 - confidence) * priorP, fromCorpus: count > 0 };
+}
+
 interface RankedCandidate {
   chord: RelChord;
   rawScore: number;
@@ -64,7 +102,12 @@ interface RankedCandidate {
  * and `surprise` build on. Normalization and slicing to `limit` happen in
  * `suggest` (SPEC.md: probabilities are "normalized over the returned
  * list," i.e. after slicing, not before). */
-function rankAll(model: TransitionModel | null, key: Key, context: RelChord[]): RankedCandidate[] {
+function rankAll(
+  model: TransitionModel | null,
+  key: Key,
+  context: RelChord[],
+  following?: RelChord,
+): RankedCandidate[] {
   const priorRaw = theoryPrior(key, context);
   let priorTotal = 0;
   for (const w of priorRaw.values()) priorTotal += w;
@@ -93,6 +136,8 @@ function rankAll(model: TransitionModel | null, key: Key, context: RelChord[]): 
   const allKeys = new Set<string>(priorRaw.keys());
   for (const k of corpusProb.keys()) allKeys.add(k);
 
+  const followingKey = following ? stateKey(following) : null;
+
   const ranked: RankedCandidate[] = [];
   for (const k of allKeys) {
     const priorP = (priorRaw.get(k) ?? 0) / priorTotal;
@@ -103,11 +148,22 @@ function rankAll(model: TransitionModel | null, key: Key, context: RelChord[]): 
     // so the whole pipeline degrades correctly to prior-only ranking
     // whenever there's no usable corpus (including model === null).
     const effectiveCorpusP = confidence * corpusP + (1 - confidence) * priorP;
-    const rawScore = effectiveCorpusP ** BLEND_EXPONENT_CORPUS * priorP ** BLEND_EXPONENT_PRIOR;
+    let rawScore = effectiveCorpusP ** BLEND_EXPONENT_CORPUS * priorP ** BLEND_EXPONENT_PRIOR;
+
+    const chord = parseStateKey(k);
+    // With a chord already sitting after the slot, a candidate has to earn its
+    // place on both sides: how well it follows the context, and how well the
+    // committed next chord follows it.
+    const backward =
+      followingKey !== null
+        ? backwardProbability(modeModel, key, context, chord, followingKey)
+        : null;
+    if (backward) rawScore *= backward.p ** BLEND_EXPONENT_BACKWARD;
+
     ranked.push({
-      chord: parseStateKey(k),
+      chord,
       rawScore,
-      fromCorpus: (corpus?.counts[k] ?? 0) > 0,
+      fromCorpus: (corpus?.counts[k] ?? 0) > 0 || (backward?.fromCorpus ?? false),
     });
   }
 
@@ -116,7 +172,7 @@ function rankAll(model: TransitionModel | null, key: Key, context: RelChord[]): 
 }
 
 export function suggest(model: TransitionModel | null, p: SuggestParams): Suggestion[] {
-  const ranked = rankAll(model, p.key, p.context);
+  const ranked = rankAll(model, p.key, p.context, p.following);
   const limit = p.limit ?? DEFAULT_SUGGEST_LIMIT;
   const top = ranked.slice(0, Math.max(0, limit));
   const sum = top.reduce((s, c) => s + c.rawScore, 0);

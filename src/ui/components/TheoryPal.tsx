@@ -21,6 +21,7 @@ import {
   melodyPitchToMidi,
   melodyToBars,
   melodyToSegments,
+  romanNumeral,
   toAbsolute,
   voiceChord,
   DEFAULT_BAR_STYLE,
@@ -32,7 +33,7 @@ import {
 import { useAudioEngine } from '../hooks/useAudioEngine.ts';
 import { useMidiOut } from '../hooks/useMidiOut.ts';
 import { useModel } from '../hooks/useModel.ts';
-import { deriveContext } from '../logic/context.ts';
+import { deriveSlotContext } from '../logic/context.ts';
 import {
   BEATS_PER_BAR,
   clearSlot,
@@ -75,6 +76,10 @@ export function TheoryPal() {
   const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
   const [division, setDivision] = useState<Division>(0.5);
   const [zoom, setZoom] = useState<Zoom>(1);
+  // Two states, not one: clicking an empty slot selects it, and only the
+  // control that appears on a selected slot aims the suggestion strip at it.
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const [targetSlot, setTargetSlot] = useState<number | null>(null);
   const [volumes, setVolumes] = useState<{ chords: number; melody: number }>({
     chords: 0.85,
     melody: 1,
@@ -108,14 +113,44 @@ export function TheoryPal() {
   // 1/16 step is 11px unzoomed, too thin to tap, and 22px at 2x.
   const beatWidth = (melody.stepsPerBar === 8 ? 36 : 44) * zoom;
 
-  const context = useMemo(() => deriveContext(chords), [chords]);
-  const suggestions = useMemo(() => suggest(model, { context, key, limit: 7 }), [model, context, key]);
+  // With no target slot this is the trailing run of chords and nothing else,
+  // exactly as before: the strip answers "what comes next". With one, it is
+  // the chords on either side of that slot, and the strip answers "what goes
+  // in here" (see model/suggest.ts and docs/gap-fill-suggestions.md).
+  const { context, following } = useMemo(
+    () => deriveSlotContext(chords, targetSlot),
+    [chords, targetSlot],
+  );
+  const suggestions = useMemo(
+    () => suggest(model, { context, following, key, limit: 7 }),
+    [model, context, following, key],
+  );
   const anyFromCorpus = suggestions.some((s) => s.fromCorpus);
+
+  // What the strip is ranking for, in the terms the user can see on the grid.
+  const targetLabel = useMemo(() => {
+    if (targetSlot === null) return null;
+    const before = context.length > 0 ? romanNumeral(context[context.length - 1], key) : null;
+    const after = following ? romanNumeral(following, key) : null;
+    if (before && after) return `between ${before} and ${after}`;
+    if (before) return `after ${before}`;
+    if (after) return `before ${after}`;
+    return 'with nothing either side of it';
+  }, [targetSlot, context, following, key]);
 
   // Update surprise suggestion when model, context, key, or reroll count changes
   useEffect(() => {
-    setSurpriseChord(surprise(model, { context, key }));
-  }, [model, context, key, surpriseRerollCount]);
+    setSurpriseChord(surprise(model, { context, following, key }));
+  }, [model, context, following, key, surpriseRerollCount]);
+
+  // A slot that has been filled, or that a resize took away, is no longer a
+  // hole to suggest for.
+  useEffect(() => {
+    const stale = (i: number | null) =>
+      i !== null && (i >= grid.slots.length || grid.slots[i].chord !== null);
+    if (stale(targetSlot)) setTargetSlot(null);
+    if (stale(selectedSlot)) setSelectedSlot(null);
+  }, [grid.slots, targetSlot, selectedSlot]);
 
   // A shorter grid can leave melody notes stranded past its end, where they
   // would keep sounding with nothing to play against.
@@ -320,6 +355,11 @@ export function TheoryPal() {
             surprise={surpriseChord}
             onAudition={handleAudition}
             onReroll={() => setSurpriseRerollCount((c) => c + 1)}
+            targetLabel={targetLabel}
+            onClearTarget={() => {
+              setTargetSlot(null);
+              setSelectedSlot(null);
+            }}
           />
           <GridContainer
             state={grid}
@@ -340,6 +380,10 @@ export function TheoryPal() {
             division={division}
             onDivisionChange={setDivision}
             beatWidth={beatWidth}
+            selectedSlot={selectedSlot}
+            targetSlot={targetSlot}
+            onSelectSlot={setSelectedSlot}
+            onTargetSlot={setTargetSlot}
           />
           <MelodySection
             lane={melody}

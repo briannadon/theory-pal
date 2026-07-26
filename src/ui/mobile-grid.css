@@ -227,3 +227,39 @@
     text-align: center;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Slot targeting: "suggest chord here" on a selected empty slot.      */
+/* ------------------------------------------------------------------ */
+
+@media (pointer: coarse) {
+  .grid-slot__suggest-btn {
+    position: relative;
+    min-height: 32px;
+    padding: 6px 4px;
+  }
+
+  /* The label is what a thumb aims at, and it already spans the tile, so it
+     only needs vertical reach. Growing sideways would steal touches from the
+     resize grips on either edge. */
+  .grid-slot__suggest-btn::before {
+    content: '';
+    position: absolute;
+    inset: -8px 0;
+  }
+
+  .tp-strip__revert {
+    min-height: 44px;
+  }
+}
+
+/* An empty slot is a tap target in its own right now that tapping one selects
+   it for suggestions, so its resize grip cannot keep claiming 20px inward on a
+   tile that may only be a beat or two wide. At 1.5 beats the grab zone reached
+   the middle of the tile and swallowed the tap. Filled slots keep the full
+   zone: their body is a drag handle rather than something you tap. */
+@media (pointer: coarse) {
+  .grid-slot--empty .grid-slot__grip::before {
+    inset: 0 0 0 -10px;
+  }
+}

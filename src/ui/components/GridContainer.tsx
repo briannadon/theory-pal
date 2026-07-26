@@ -48,6 +48,12 @@ export interface GridContainerProps {
   /** Pixels per beat. Shared with the melody lane so a chord tile sits over
    * exactly the melody steps it sounds against. */
   beatWidth: number;
+  /** The empty slot a click has selected, and the one the suggestion strip is
+   * currently ranking for. See GridSlot for why they are two states. */
+  selectedSlot?: number | null;
+  targetSlot?: number | null;
+  onSelectSlot?: (index: number | null) => void;
+  onTargetSlot?: (index: number | null) => void;
 }
 
 const SIZES: GridSize[] = [4, 8, 16];
@@ -68,6 +74,10 @@ export function GridContainer({
   division,
   onDivisionChange,
   beatWidth,
+  selectedSlot = null,
+  targetSlot = null,
+  onSelectSlot,
+  onTargetSlot,
 }: GridContainerProps) {
   const slotIds = state.slots.map((_, i) => slotId(i));
   const hasChords = state.slots.some((s) => s.chord !== null);
@@ -208,6 +218,12 @@ export function GridContainer({
                     division={division}
                     onResize={onResizeSlot ? (next) => onResizeSlot(i, next) : undefined}
                     onSetStart={onSetSlotStart ? (next) => onSetSlotStart(i, next) : undefined}
+                    isSelected={selectedSlot === i}
+                    isTargeted={targetSlot === i}
+                    onSelect={
+                      onSelectSlot ? () => onSelectSlot(selectedSlot === i ? null : i) : undefined
+                    }
+                    onSuggestHere={onTargetSlot ? () => onTargetSlot(i) : undefined}
                     onStartEdgeDrag={
                       onSetSlotStart
                         ? (clientX) =>

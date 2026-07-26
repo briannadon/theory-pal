@@ -14,18 +14,43 @@ export interface SuggestionStripProps {
   surprise: Suggestion | null;
   onAudition: (chord: Suggestion['chord']) => void;
   onReroll: () => void;
+  /** Describes the slot being ranked for, e.g. "between IV and I", when the
+   * strip is aimed at a slot rather than at the end of the progression. Null
+   * for the default. The two modes return different chords and otherwise look
+   * identical, so the strip has to say which question it is answering. */
+  targetLabel?: string | null;
+  onClearTarget?: () => void;
 }
 
-export function SuggestionStrip({ keyValue, suggestions, surprise, onAudition, onReroll }: SuggestionStripProps) {
+export function SuggestionStrip({
+  keyValue,
+  suggestions,
+  surprise,
+  onAudition,
+  onReroll,
+  targetLabel = null,
+  onClearTarget,
+}: SuggestionStripProps) {
   return (
-    <section className="tp-strip">
+    <section className={`tp-strip${targetLabel ? ' tp-strip--targeted' : ''}`}>
       <div className="tp-strip__header">
-        <span className="tp-strip__eyebrow">Next</span>
-        <span className="tp-strip__hint">
-          ranked by likelihood ·
-          <span className="tp-hint--fine"> drag into the grid</span>
-          <span className="tp-hint--coarse"> hold, then drag into the grid</span>
-        </span>
+        <span className="tp-strip__eyebrow">{targetLabel ? 'Here' : 'Next'}</span>
+        {targetLabel ? (
+          <>
+            <span className="tp-strip__hint">chords for the selected slot, {targetLabel}</span>
+            {onClearTarget && (
+              <button type="button" className="tp-btn tp-strip__revert" onClick={onClearTarget}>
+                suggest next chord instead
+              </button>
+            )}
+          </>
+        ) : (
+          <span className="tp-strip__hint">
+            ranked by likelihood ·
+            <span className="tp-hint--fine"> drag into the grid</span>
+            <span className="tp-hint--coarse"> hold, then drag into the grid</span>
+          </span>
+        )}
       </div>
       <div className="tp-strip__cells">
         {suggestions.map((s, i) => {

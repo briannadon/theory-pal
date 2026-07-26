@@ -41,13 +41,24 @@ export interface Suggestion {
   probability: number;
   diatonic: boolean;
   /** false = the theory prior alone carried this candidate; true = corpus
-   * counts for the active context contributed a nonzero observed count. */
+   * counts contributed a nonzero observed count in either direction, i.e. for
+   * the transition into this chord or (when `following` is set) out of it. */
   fromCorpus: boolean;
 }
 
 export interface SuggestParams {
   /** Chord history, oldest first, most recent last. May be empty. */
   context: RelChord[];
+  /**
+   * The chord immediately after the slot being filled, when there is one.
+   * Ranks candidates by how well they sit *between* `context` and this chord
+   * rather than by what follows `context` alone. Omit for the default case of
+   * extending a progression, which ranks exactly as it did before this
+   * existed. Only the immediately following chord is useful: at order 1 any
+   * chord past it contributes a factor with no candidate in it, which divides
+   * out of the ranking. See docs/gap-fill-suggestions.md.
+   */
+  following?: RelChord;
   key: Key;
   limit?: number;
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Key, RelChord } from '../theory/index.ts';
 import { DEFAULT_SUGGEST_LIMIT } from './constants.ts';
-import { suggest } from './suggest.ts';
+import { suggest, surprise } from './suggest.ts';
 import type { ModeModel, TransitionModel } from './types.ts';
 
 function makeModel(modes: Partial<Record<string, ModeModel>>): TransitionModel {
@@ -140,5 +140,88 @@ describe('suggest: order-2 with backoff to order-1, then to the prior', () => {
     const list = suggest(fractional, { context, key: cMajor, limit: 10 });
     const sum = list.reduce((s, x) => s + x.probability, 0);
     expect(sum).toBeCloseTo(1, 6);
+  });
+});
+
+describe('suggest: filling a slot that already has a chord after it', () => {
+  const I: RelChord = { degree: 0, quality: 'maj' };
+  const ii: RelChord = { degree: 2, quality: 'min' };
+  const IV: RelChord = { degree: 5, quality: 'maj' };
+  const V: RelChord = { degree: 7, quality: 'maj' };
+  const bVII: RelChord = { degree: 10, quality: 'maj' };
+
+  const rankIn = (list: ReturnType<typeof suggest>, chord: RelChord) =>
+    list.findIndex((s) => s.chord.degree === chord.degree && s.chord.quality === chord.quality);
+  const probIn = (list: ReturnType<typeof suggest>, chord: RelChord) =>
+    list.find((s) => s.chord.degree === chord.degree && s.chord.quality === chord.quality)
+      ?.probability ?? 0;
+
+  it('omitting `following` leaves the ranking exactly as it was', () => {
+    const forward = suggest(null, { context: [IV], key: cMajor, limit: 20 });
+    const explicitUndefined = suggest(null, {
+      context: [IV],
+      following: undefined,
+      key: cMajor,
+      limit: 20,
+    });
+    expect(explicitUndefined).toEqual(forward);
+  });
+
+  it('puts V first between IV and I, where forward-only ranking prefers bVII', () => {
+    const forward = suggest(null, { context: [IV], key: cMajor, limit: 20 });
+    // Both are idiomatic continuations of IV, and the prior ranks the backdoor
+    // bVII first when it only knows what came before.
+    expect(rankIn(forward, bVII)).toBeLessThan(rankIn(forward, V));
+
+    const between = suggest(null, { context: [IV], following: I, key: cMajor, limit: 20 });
+    expect(rankIn(between, V)).toBe(0);
+  });
+
+  it('lifts the normative predominants for a slot before V', () => {
+    const forward = suggest(null, { context: [I], key: cMajor, limit: 20 });
+    const between = suggest(null, { context: [I], following: V, key: cMajor, limit: 20 });
+    expect(rankIn(between, ii)).toBeLessThan(rankIn(forward, ii));
+  });
+
+  it('demotes a candidate that follows the context well but leads nowhere', () => {
+    // I is a fine chord after IV (a plagal move) and a poor one before another
+    // I, which forward-only ranking cannot see.
+    const forward = suggest(null, { context: [IV], key: cMajor, limit: 20 });
+    const between = suggest(null, { context: [IV], following: I, key: cMajor, limit: 20 });
+    expect(probIn(forward, V) / probIn(forward, I)).toBeLessThan(
+      probIn(between, V) / probIn(between, I),
+    );
+  });
+
+  it('ranks on the backward side alone when the slot starts the progression', () => {
+    // The case this feature exists for: clearing the first chord and asking
+    // what belongs in front of what is left.
+    const between = suggest(null, { context: [], following: V, key: cMajor, limit: 20 });
+    expect(rankIn(between, IV)).toBe(0);
+    expect(rankIn(between, ii)).toBeLessThan(rankIn(between, V));
+  });
+
+  it('flags fromCorpus when only the backward transition was observed', () => {
+    const backwardOnly = makeModel({
+      ionian: {
+        order1: { '5:maj': { '0:maj': 10 } },
+        order2: {},
+        totals1: { '5:maj': 10 },
+        totals2: {},
+      },
+    });
+    // No context, so nothing is observed going *into* IV; the corpus only
+    // knows that IV goes to I.
+    const list = suggest(backwardOnly, { context: [], following: I, key: cMajor, limit: 20 });
+    expect(list[rankIn(list, IV)].fromCorpus).toBe(true);
+  });
+
+  it('reaches surprise() too', () => {
+    const rng = () => 0.0001;
+    const forward = surprise(null, { context: [IV], key: cMajor }, rng);
+    const between = surprise(null, { context: [IV], following: I, key: cMajor }, rng);
+    expect(forward).not.toBeNull();
+    expect(between).not.toBeNull();
+    expect(between!.chord).not.toEqual(forward!.chord);
   });
 });

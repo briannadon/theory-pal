@@ -25,6 +25,17 @@ export const BLEND_EXPONENT_CORPUS = 1.0;
 export const BLEND_EXPONENT_PRIOR = 0.6;
 
 /**
+ * Exponent on the backward probability P(following | context, candidate),
+ * used only when ranking a chord for a slot that already has a chord after it.
+ * 1.0 is what the Bayes derivation implies: for a Markov chain,
+ * P(X | A, B) is proportional to P(X | A) * P(B | X), so the chord before the
+ * slot and the chord after it are equally binding on what goes between them.
+ * Lower it to let what already follows the slot matter less than what precedes
+ * it. See docs/gap-fill-suggestions.md.
+ */
+export const BLEND_EXPONENT_BACKWARD = 1.0;
+
+/**
  * Confidence in the corpus counts for a given (context) state, as a function
  * of the total observed transition count for that context:
  *   confidence = total / (total + CONFIDENCE_HALF_COUNT)

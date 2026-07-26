@@ -39,6 +39,15 @@ export interface GridSlotProps {
   onSetStart?: (start: number) => void;
   /** Hand a left-edge pointer drag to the grid, which tracks it (see below). */
   onStartEdgeDrag?: (clientX: number) => void;
+  /** Empty slots only. Clicking one selects it, which reveals the control that
+   * aims the suggestion strip at this slot instead of at the end of the
+   * progression. Selection is the intermediate step on purpose: a stray click
+   * on empty track should not silently rewrite what the strip is answering. */
+  isSelected?: boolean;
+  onSelect?: () => void;
+  /** Set while this slot is the one the suggestion strip is ranking for. */
+  isTargeted?: boolean;
+  onSuggestHere?: () => void;
 }
 
 /** Below these widths the tile cannot hold its text, so it sheds it rather
@@ -66,6 +75,10 @@ export function GridSlot({
   onResize,
   onSetStart,
   onStartEdgeDrag,
+  isSelected = false,
+  isTargeted = false,
+  onSelect,
+  onSuggestHere,
 }: GridSlotProps) {
   const [modsOpen, setModsOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -236,7 +249,7 @@ export function GridSlot({
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid-slot${isDragging ? ' grid-slot--dragging' : ''}${isPlaying ? ' grid-slot--playing' : ''}${chord ? '' : ' grid-slot--empty'}${sizeClass}`}
+      className={`grid-slot${isDragging ? ' grid-slot--dragging' : ''}${isPlaying ? ' grid-slot--playing' : ''}${chord ? '' : ' grid-slot--empty'}${isSelected ? ' grid-slot--selected' : ''}${isTargeted ? ' grid-slot--targeted' : ''}${sizeClass}`}
       onPointerEnter={() => onHoverChange?.(true)}
       onPointerLeave={() => onHoverChange?.(false)}
     >
@@ -245,9 +258,15 @@ export function GridSlot({
         className="grid-slot__body"
         onClick={() => {
           if (chord) onAudition();
+          else onSelect?.();
         }}
         title={`${label} · ${lengthText} · bar ${position}`}
-        aria-label={`Bar ${position}, ${lengthText}: ${label}`}
+        aria-label={
+          chord
+            ? `Bar ${position}, ${lengthText}: ${label}`
+            : `Empty slot at bar ${position}. Select it to get suggestions for it.`
+        }
+        {...(chord ? {} : { 'aria-pressed': isSelected || isTargeted })}
         {...(chord ? { ...attributes, ...listeners } : {})}
       >
         <ChordFace roman={roman} name={name} accent={accent} placeholder="+" />
@@ -263,6 +282,20 @@ export function GridSlot({
           aria-label={`Clear the chord at bar ${position}`}
         >
           ×
+        </button>
+      )}
+      {!chord && isSelected && !isTargeted && onSuggestHere && (
+        <button
+          type="button"
+          className="grid-slot__suggest-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSuggestHere();
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-label={`Rank suggestions for the empty slot at bar ${position}`}
+        >
+          suggest chord here
         </button>
       )}
       {chord && onModifyChord && (
