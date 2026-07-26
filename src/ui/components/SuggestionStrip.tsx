@@ -21,7 +21,11 @@ export function SuggestionStrip({ keyValue, suggestions, surprise, onAudition, o
     <section className="tp-strip">
       <div className="tp-strip__header">
         <span className="tp-strip__eyebrow">Next</span>
-        <span className="tp-strip__hint">ranked by likelihood · drag into the grid</span>
+        <span className="tp-strip__hint">
+          ranked by likelihood ·
+          <span className="tp-hint--fine"> drag into the grid</span>
+          <span className="tp-hint--coarse"> hold, then drag into the grid</span>
+        </span>
       </div>
       <div className="tp-strip__cells">
         {suggestions.map((s, i) => {

@@ -1,0 +1,229 @@
+/* Mobile / touch overrides for the progression grid (GridContainer, GridSlot,
+   ModifierBar). Loaded after theme.css so equal-specificity rules here win.
+   Owned by the grid work package; keep melody and page-chrome rules out.
+
+   The grid stays a timeline on a phone: a tile's width is a duration, so it
+   never compresses (see theme.css). What changes here is how you touch it —
+   bigger hit areas, deliberate touch-action per element, and a popover that
+   fits a phone screen instead of floating off it. */
+
+/* ------------------------------------------------------------------ */
+/* Touch-action: let a bare finger scroll the track, but hand the      */
+/* gesture entirely to JS wherever a drag means something (a grip, or  */
+/* a filled tile being reordered).                                     */
+/* ------------------------------------------------------------------ */
+
+/* Empty slots are never the sortable drag surface (dnd-kit disables their
+   `draggable`) — they only accept drops. theme.css sets touch-action: none on
+   every .grid-slot so the *filled* ones don't fight dnd-kit's drag, but that
+   same rule was also swallowing scroll gestures over the empty stretches,
+   which on a phone is most of the track. Give empty slots their pan back. */
+.grid-slot.grid-slot--empty {
+  touch-action: pan-x pan-y;
+}
+
+/* theme.css sets overflow-x: auto and overflow-y: visible on the scroller —
+   but per the CSS overflow spec, pairing 'visible' with a non-visible axis
+   silently upgrades the visible one to 'auto' too. That makes this element a
+   real (if empty) vertical scroll container, which traps a vertical touch
+   drag right here rather than chaining it up to the page, even though it has
+   nothing to scroll. Pinning it to 'hidden' — same as having no vertical
+   overflow to show either way — keeps the quirk from ever kicking in. */
+.tp-grid__scroll {
+  overflow-y: hidden;
+}
+
+/* ------------------------------------------------------------------ */
+/* Real hit areas for the resize/move grips, on coarse pointers only.  */
+/* The visual grip stays exactly as slim as it is today; a transparent */
+/* ::before widens what a finger can actually land on.                 */
+/* ------------------------------------------------------------------ */
+
+@media (pointer: coarse) {
+  .grid-slot__grip {
+    touch-action: none;
+  }
+
+  /* Grows inward (toward the tile's own body), never outward across the
+     tile boundary — an adjacent tile has its own grip right there, and an
+     outward-grown hitbox would fight it for the same touch. */
+  .grid-slot__grip::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 0 -20px;
+  }
+
+  .grid-slot__grip--start::before {
+    inset: 0 -20px 0 0;
+  }
+
+  /* Tiny tiles (see theme.css's --tiny variant) don't have 20px of their own
+     body to spare — a full-size inward grow would eat the tile whole. Still
+     wider than the bare 4px grip, just not to the 24px ideal; very short
+     chords stay a two-hand job. */
+  .grid-slot--tiny .grid-slot__grip::before {
+    inset: 0 0 0 -8px;
+  }
+
+  .grid-slot--tiny .grid-slot__grip--start::before {
+    inset: 0 -8px 0 0;
+  }
+
+  .grid-slot__grip:active {
+    background: var(--accent-diatonic);
+    opacity: 0.55;
+  }
+
+  /* The clear "x" is a 16px dot — fine for a cursor, not for a fingertip.
+     Same trick: the dot stays put, the hitbox around it grows. */
+  .grid-slot__clear::before {
+    content: '';
+    position: absolute;
+    inset: -14px;
+  }
+
+  /* The mods button already spans the tile's full width, so it only needs
+     more height, not width — growing sideways would just steal touches from
+     the grips on either edge. */
+  .grid-slot__mods-btn {
+    position: relative;
+  }
+
+  .grid-slot__mods-btn::before {
+    content: '';
+    position: absolute;
+    inset: -12px 0;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Modifier popover: keep it inside the viewport at any size, and turn */
+/* it into a bottom sheet once the screen is too narrow to float one   */
+/* beside the tile that opened it.                                     */
+/* ------------------------------------------------------------------ */
+
+/* Extends the existing viewport clamp in GridSlot's `place()`: that function
+   keeps the panel's *position* on-screen, but never bounded its *size*, so a
+   popover wider or taller than the viewport could still spill past its own
+   clamped corner. Wrapping the toggle row and capping height turns an
+   overflow into a wrap or a scroll instead. Harmless on desktop — neither
+   rule does anything until the content actually needs the room. */
+.grid-slot__popover {
+  max-width: calc(100vw - 16px);
+  max-height: min(70vh, 480px);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.grid-slot__popover .tp-size-group {
+  flex-wrap: wrap;
+}
+
+.grid-slot__popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.grid-slot__popover-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+.grid-slot__popover-close {
+  all: unset;
+  cursor: pointer;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+  text-align: center;
+  border-radius: 999px;
+  color: var(--ink-faint);
+  font-size: 14px;
+}
+
+.grid-slot__popover-close:hover {
+  color: var(--accent-danger);
+  background: var(--bg-3);
+}
+
+@media (pointer: coarse) {
+  .grid-slot__popover .tp-size-btn {
+    min-height: 44px;
+    min-width: 44px;
+    flex: 1 1 64px;
+  }
+
+  .grid-slot__popover-close {
+    width: 44px;
+    height: 44px;
+    line-height: 44px;
+    font-size: 18px;
+  }
+}
+
+/* Below ~480px there usually isn't room to float the popover beside the
+   tile at all — the fix is a bottom sheet instead of a floating card. This
+   overrides the inline left/top the JS `place()` call sets; !important is
+   what it takes to beat an inline style, and place() keeps running (it just
+   computes coordinates nothing here uses), so nothing about its
+   viewport-tracking logic needs to change. */
+@media (max-width: 480px) {
+  .grid-slot__popover {
+    position: fixed !important;
+    left: 8px !important;
+    right: 8px !important;
+    top: auto !important;
+    bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+    width: auto;
+    max-width: none;
+    white-space: normal;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Header: grid size, chord-length snap, and Clear share one row that  */
+/* wraps badly once the two control groups and the hint text compete   */
+/* for space below ~480px. Reflow into eyebrow+Clear on top, each      */
+/* control group full-width below; drop the hint, which just repeats   */
+/* what the (now touch-sized) grips teach by feel.                     */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 480px) {
+  .tp-grid__header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 8px;
+    row-gap: 8px;
+    align-items: center;
+  }
+
+  .tp-grid__header .tp-btn {
+    /* Grid's sparse auto-placement doesn't backtrack: once the size and
+       division groups claim full rows below it, row 1's second column is
+       skipped rather than filled. Pin Clear there explicitly. */
+    grid-column: 2;
+    grid-row: 1;
+    margin-left: 0 !important;
+  }
+
+  .tp-grid__header .tp-size-group {
+    grid-column: 1 / -1;
+  }
+
+  .tp-grid__header .tp-strip__hint {
+    display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .tp-grid__header .tp-size-btn {
+    min-height: 44px;
+    flex: 1;
+    text-align: center;
+  }
+}

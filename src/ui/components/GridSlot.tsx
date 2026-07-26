@@ -214,6 +214,11 @@ export function GridSlot({
     if (!onStartEdgeDrag) return;
     e.preventDefault();
     e.stopPropagation();
+    // The grid tracks the rest of this gesture on window listeners (see
+    // GridContainer — this tile can be unmounted mid-drag), but capturing
+    // here too means a finger that slides off the 7px grip doesn't lose the
+    // gesture to whatever it slid onto in the meantime.
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     onStartEdgeDrag(e.clientX);
   };
 
@@ -289,6 +294,20 @@ export function GridSlot({
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
               >
+                {/* Tap-outside already closes this (see the pointerdown listener
+                    above), but that's invisible until you find it by accident on
+                    a phone — an explicit close control is the one a thumb can see. */}
+                <div className="grid-slot__popover-head">
+                  <span className="grid-slot__popover-title">Modifiers</span>
+                  <button
+                    type="button"
+                    className="grid-slot__popover-close"
+                    aria-label="Close modifiers"
+                    onClick={() => setModsOpen(false)}
+                  >
+                    ×
+                  </button>
+                </div>
                 <ModifierBar
                   value={modifierState(chord)}
                   onToggle={(modifier: ChordModifier) =>

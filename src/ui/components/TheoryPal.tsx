@@ -4,7 +4,8 @@
 import {
   DndContext,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -52,7 +53,7 @@ import { voiceGrid } from '../logic/voicing.ts';
 import { DiatonicStrip } from './DiatonicStrip.tsx';
 import { GridContainer } from './GridContainer.tsx';
 import { KeyPicker } from './KeyPicker.tsx';
-import { MelodySection } from './MelodySection.tsx';
+import { MelodySection, type Zoom } from './MelodySection.tsx';
 import { ModelBadge } from './ModelBadge.tsx';
 import { SoundOverlay } from './SoundOverlay.tsx';
 import { SuggestionStrip } from './SuggestionStrip.tsx';
@@ -73,6 +74,7 @@ export function TheoryPal() {
   const [melodySurprise, setMelodySurprise] = useState<number>(0.25);
   const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
   const [division, setDivision] = useState<Division>(0.5);
+  const [zoom, setZoom] = useState<Zoom>(1);
   const [volumes, setVolumes] = useState<{ chords: number; melody: number }>({
     chords: 0.85,
     melody: 1,
@@ -101,8 +103,10 @@ export function TheoryPal() {
   }, [grid]);
   // The lane's columns are beats wide, and the progression grid draws its
   // tiles at the same scale, so a chord tile sits over exactly the melody
-  // steps it sounds against.
-  const beatWidth = melody.stepsPerBar === 8 ? 36 : 44;
+  // steps it sounds against. Zoom multiplies that shared scale rather than
+  // the lane's alone, which is what keeps the two aligned at every level: a
+  // 1/16 step is 11px unzoomed, too thin to tap, and 22px at 2x.
+  const beatWidth = (melody.stepsPerBar === 8 ? 36 : 44) * zoom;
 
   const context = useMemo(() => deriveContext(chords), [chords]);
   const suggestions = useMemo(() => suggest(model, { context, key, limit: 7 }), [model, context, key]);
@@ -149,9 +153,16 @@ export function TheoryPal() {
     return () => clearInterval(timer);
   }, [isPlaying]);
 
-  // dnd-kit sensors: distance constraint of 5px allows click and drag to coexist on chord buttons
+  // dnd-kit sensors, split by input type rather than one PointerSensor for both:
+  // Pointer Events fire for touch too, so a single PointerSensor with a distance
+  // constraint reacts to a scrolling swipe as fast as it would to a deliberate
+  // mouse drag, hijacking the page's vertical scroll on touch. Mouse gets the
+  // old distance-based constraint (a few px of movement past a click starts a
+  // drag); touch gets a short press-and-hold instead, so a quick swipe is free
+  // to scroll and only a held finger starts a drag.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -339,6 +350,8 @@ export function TheoryPal() {
             hoveredSlot={hoveredSlot}
             onHoverSlot={setHoveredSlot}
             beatWidth={beatWidth}
+            zoom={zoom}
+            onZoomChange={setZoom}
             surprise={melodySurprise}
             onSurpriseChange={setMelodySurprise}
             onChange={setMelody}

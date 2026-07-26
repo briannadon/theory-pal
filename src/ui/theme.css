@@ -48,6 +48,11 @@
   --radius: 6px;
   --radius-lg: 10px;
 
+  /* Real height of the fixed transport bar, kept current by a ResizeObserver
+     in Transport.tsx. The fallback matches its old fixed single-row height,
+     for the first paint before the observer's first callback lands. */
+  --transport-h: 96px;
+
   color-scheme: dark;
 }
 
@@ -63,7 +68,11 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding: 20px clamp(14px, 3vw, 40px) 96px;
+  /* Bottom padding tracks the fixed transport's real height (see
+     --transport-h) plus a small gap, so the last row of content is never
+     hidden under it — true whether the bar is one row on desktop or a
+     collapsed/expanded stack on a phone. */
+  padding: 20px clamp(14px, 3vw, 40px) calc(var(--transport-h) + 16px);
 }
 
 /* focus ring, applied consistently to every interactive control */
@@ -120,11 +129,16 @@
 
 .tp-tonics {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   background: var(--bg-1);
   padding: 4px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
+  /* 12 buttons don't fit one row under ~380px of available width; wrapping
+     to two rows keeps every tonic reachable without a horizontal scroller
+     or shrinking hit targets below the touch minimum. */
+  max-width: 100%;
 }
 
 .tp-tonic-btn {
@@ -297,8 +311,9 @@
 
 .tp-strip__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
+  gap: 6px 10px;
 }
 
 .tp-strip__eyebrow {
@@ -314,13 +329,59 @@
   color: var(--ink-faint);
 }
 
+/* One instruction per input method, because they are not the same gesture: a
+   mouse drag starts on the first pixel of movement, a touch drag only after a
+   press is held (see the TouchSensor delay in TheoryPal), and a phone user who
+   is told plain "drag" will swipe, scroll the page, and conclude the chord
+   cannot be moved. */
+.tp-hint--coarse {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .tp-hint--fine {
+    display: none;
+  }
+
+  .tp-hint--coarse {
+    display: inline;
+  }
+}
+
 .tp-strip__cells {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: thin;
+  padding: 0 2px 4px;
+  scrollbar-width: none;
   align-items: flex-start;
+  /* A carousel, not a plain overflow box: cells settle on their own edge
+     rather than stopping mid-cell, momentum scrolling on iOS Safari (a no-op
+     everywhere else), and no scrollbar gutter to eat vertical space on
+     touch. "proximity" rather than "mandatory" so a fast flick can still
+     coast past a snap point instead of being yanked back. */
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  /* The strip is already inset by the page's own side padding; this fade
+     is the "more cells exist" cue at each end, on top of the partial cell
+     that's already visible past the fold. */
+  mask-image: linear-gradient(to right, transparent, black 10px, black calc(100% - 10px), transparent);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 10px,
+    black calc(100% - 10px),
+    transparent
+  );
+}
+
+/* Fine pointers (mouse/trackpad) get the old visible thin scrollbar back —
+   it's useful affordance there and costs no space, since hover/scrollbar
+   chrome doesn't compete with a finger. */
+@media (hover: hover) and (pointer: fine) {
+  .tp-strip__cells {
+    scrollbar-width: thin;
+  }
 }
 
 /* ---------------------------------------------------------------------- */
@@ -331,7 +392,12 @@
   all: unset;
   cursor: grab;
   flex: none;
-  touch-action: none;
+  scroll-snap-align: start;
+  /* Not `none`: with the TouchSensor's delay-based activation (TheoryPal.tsx),
+     a quick swipe that never completes the press-and-hold needs the browser's
+     native scroll to still happen underneath it. `manipulation` allows
+     panning/scrolling while still suppressing double-tap-to-zoom. */
+  touch-action: manipulation;
 }
 
 .strip-cell:active {
@@ -475,6 +541,9 @@
   align-items: stretch;
   gap: 6px;
   flex: none;
+  /* This wrapper, not the inner .strip-cell, is the direct flex child of
+     .tp-strip__cells, so it's what the snap container measures against. */
+  scroll-snap-align: start;
 }
 
 .tp-reroll-btn {
@@ -992,9 +1061,42 @@
   flex-wrap: wrap;
   gap: 18px;
   padding: 12px clamp(14px, 3vw, 40px);
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   background: var(--bg-1);
   border-top: 1px solid var(--line);
   z-index: 10;
+}
+
+/* On wide layouts these two grouping wrappers are invisible to layout —
+   their children are direct flex items of .tp-transport, unchanged from
+   before there were two groups at all. Only the narrow-layout media query
+   below turns them into an actual primary-row / disclosure-panel split. */
+.tp-transport__primary,
+.tp-transport__more {
+  display: contents;
+}
+
+/* Only relevant once the narrow-layout media query turns .tp-transport__more
+   into an actual collapsible panel; hidden here so it isn't a dead button
+   sitting in the middle of the wide desktop row. */
+.tp-transport__more-toggle {
+  all: unset;
+  display: none;
+  cursor: pointer;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-dim);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  flex: none;
+}
+
+.tp-transport__more-toggle[aria-expanded='true'] {
+  color: var(--ink);
+  background: var(--bg-2);
 }
 
 .tp-transport__play {
@@ -1182,8 +1284,65 @@
     margin-left: 0;
   }
 
+  /* The transport carries too much (play, bpm, loop, piano, style, two
+     faders, MIDI picker, export) to lay out in one wrapped block on a phone
+     without either eating a huge share of the viewport or burying the play
+     button. Split it into an always-visible primary row (play + bpm) and a
+     disclosure panel for everything else, capped so the whole bar — open or
+     closed — never exceeds about a quarter of the viewport height. */
   .tp-transport {
     justify-content: flex-start;
+    flex-direction: column;
+    align-items: stretch;
+    max-height: 25vh;
+    gap: 8px;
+  }
+
+  .tp-transport__primary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+  }
+
+  .tp-transport__more-toggle {
+    display: inline-flex;
+    margin-left: auto;
+  }
+
+  .tp-transport__more {
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    overflow-y: auto;
+    /* Lets the panel actually shrink to fit under the 25vh cap instead of
+       forcing the flex column to grow past it. */
+    min-height: 0;
+  }
+
+  .tp-transport__more--open {
+    display: flex;
+  }
+
+  .tp-transport__group,
+  .tp-midi-picker {
+    flex-wrap: wrap;
+  }
+
+  .tp-transport__spacer {
+    display: none;
+  }
+
+  /* Key picker: 12 tonic buttons already wrap (see .tp-tonics), so this only
+     needs to stop stretching the scale <select> edge-to-edge awkwardly. */
+  .tp-key-picker {
+    width: 100%;
+  }
+
+  .tp-scale-select {
+    max-width: none;
+    flex: 1 1 auto;
   }
 
   /* The timeline keeps its scale on a phone and scrolls instead of
@@ -1191,5 +1350,67 @@
      saying something false about the music. */
   .tp-grid__header {
     flex-wrap: wrap;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Touch targets                                                          */
+/* ---------------------------------------------------------------------- */
+/* Gated on (pointer: coarse) rather than viewport width: a touch-only
+   control needs a bigger hit area on a coarse-pointer tablet at desktop
+   width too, and a resized desktop browser window (mouse) shouldn't grow
+   buttons just because it's narrow. Below the 44x44 CSS px minimum before
+   this: tonic buttons (~26x27), the scale select (~34 tall), the reroll
+   button (~28 tall), the transport's play button (40x40), its toggles,
+   tempo input and selects (~26-34 tall), and the plain .tp-btn family. */
+@media (pointer: coarse) {
+  .tp-tonic-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 10px 9px;
+  }
+
+  .tp-scale-select {
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+
+  .tp-reroll-btn {
+    min-height: 44px;
+  }
+
+  /* The modifier toggles (sus2/sus4/6/7/9/11/13) are a row of seven on a
+     strip that's already tight for width at 360px; holding the line on
+     min-width would force a horizontal scrollbar back in. Height and a
+     little extra padding cover the touch minimum on the dimension that
+     matters most for a row of adjacent small buttons. */
+  .tp-size-btn {
+    min-height: 44px;
+    padding: 10px 10px;
+  }
+
+  .tp-transport__play {
+    width: 44px;
+    height: 44px;
+  }
+
+  .tp-toggle,
+  .tp-btn,
+  .tp-midi-picker__select,
+  .tp-tempo-input,
+  .tp-transport__more-toggle {
+    min-height: 44px;
+  }
+
+  .tp-toggle,
+  .tp-btn {
+    padding: 10px 12px;
+  }
+
+  /* Range inputs render a thin track with no box of their own; padding
+     (not margin) widens the actual hit-testable element without changing
+     how thick the track looks, since the track stays centered inside it. */
+  .tp-transport__mixer input[type='range'] {
+    padding-block: 12px;
   }
 }

@@ -21,7 +21,7 @@
 // cell. A 16-bar 1/16 lane is 256 columns; per-cell elements would be 6400
 // nodes to mount and hit-test, while this is 25 gradients plus one element per
 // actual note.
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   addMelodyNote,
   melodyPitchToMidi,
@@ -62,11 +62,23 @@ export interface MelodyLaneProps {
   /** Pixels per beat, shared with the progression grid so a chord tile sits
    * directly over the melody steps it sounds against. */
   beatWidth: number;
+  /** Touch's stand-in for the alt-drag erase marquee: a phone has no alt
+   * key, so a section-header toggle puts the lane into the same erase-box
+   * gesture that alt normally arms. Alt still works on desktop regardless. */
+  eraseMode?: boolean;
 }
 
 const ROW_H = 13;
+/** Row height on a coarse (touch) pointer. Pitch, unlike the step axis, isn't
+ * shared with the chord grid, so it's free to grow for fatter fingers without
+ * desyncing anything. */
+const ROW_H_COARSE = 20;
 const BEATS_PER_BAR = 4;
 const RESIZE_GRIP_PX = 6;
+const RESIZE_GRIP_PX_COARSE = 14;
+/** How far a touch can drift from its start and still count as a tap rather
+ * than the start of a page/lane swipe. */
+const TAP_SLOP_PX = 10;
 
 interface Cell {
   step: number;
@@ -80,6 +92,21 @@ type Drag =
   | { kind: 'erase'; from: Cell; to: Cell }
   | null;
 
+/** Tracks (pointer: coarse) live rather than reading it once, since a
+ * detachable touchscreen/mouse combo can flip it mid-session. */
+function useCoarsePointer(): boolean {
+  const [coarse, setCoarse] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(pointer: coarse)');
+    const onChange = () => setCoarse(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return coarse;
+}
+
 export function MelodyLane({
   lane,
   keyValue,
@@ -91,16 +118,43 @@ export function MelodyLane({
   onChange,
   onAuditionPitch,
   beatWidth,
+  eraseMode = false,
 }: MelodyLaneProps) {
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag>(null);
+  // A touch that hasn't moved past the slop threshold yet: note creation is
+  // deferred until pointerup confirms it was a tap and not the start of a
+  // swipe, so a plain finger drag over empty cells scrolls instead of
+  // drawing (see the surface's touch-action, set below).
+  const pendingTapRef = useRef<{ cell: Cell; x: number; y: number } | null>(null);
+
+  const isCoarsePointer = useCoarsePointer();
+  const rowH = isCoarsePointer ? ROW_H_COARSE : ROW_H;
+  const resizeGripPx = isCoarsePointer ? RESIZE_GRIP_PX_COARSE : RESIZE_GRIP_PX;
 
   const beatsPerStep = BEATS_PER_BAR / lane.stepsPerBar;
   const stepW = beatWidth * beatsPerStep;
   const totalSteps = bars * lane.stepsPerBar;
   const totalBeats = bars * BEATS_PER_BAR;
   const width = totalSteps * stepW;
-  const height = MELODY_ROWS * ROW_H;
+  const height = MELODY_ROWS * rowH;
+
+  // Zooming from the toolbar would otherwise leave scrollLeft where it was,
+  // which lands the user somewhere else in the tune: at 3x, the bar that was
+  // on screen is now a third of the way into a lane three times as long. Hold
+  // the centered moment still instead. Width is bars * 4 * beatWidth, so
+  // beatWidth alone says how the scale moved (changing resolution rescales
+  // steps but not the lane).
+  const prevBeatWidthRef = useRef(beatWidth);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    const prev = prevBeatWidthRef.current;
+    prevBeatWidthRef.current = beatWidth;
+    if (!el || prev === beatWidth || prev <= 0) return;
+    const centered = el.scrollLeft + el.clientWidth / 2;
+    el.scrollLeft = (centered / prev) * beatWidth - el.clientWidth / 2;
+  }, [beatWidth]);
 
   /** Which slot is sounding at a beat — the lane's link between its own even
    * grid and the uneven chord timeline above it. */
@@ -135,11 +189,11 @@ export function MelodyLane({
       const rect = surfaceRef.current?.getBoundingClientRect();
       if (!rect) return null;
       const step = Math.floor((clientX - rect.left) / stepW);
-      const row = Math.floor((clientY - rect.top) / ROW_H);
+      const row = Math.floor((clientY - rect.top) / rowH);
       if (step < 0 || step >= totalSteps || row < 0 || row >= MELODY_ROWS) return null;
       return { step, pitch: pitchForRow(row) };
     },
-    [stepW, totalSteps],
+    [stepW, totalSteps, rowH],
   );
 
   const capture = (e: React.PointerEvent) => {
@@ -150,15 +204,26 @@ export function MelodyLane({
     if (drag) return;
     const cell = pointToCell(e.clientX, e.clientY);
     if (!cell) return;
-    capture(e);
 
-    if (e.altKey) {
-      // Alt-press starts an erase box. A press with no movement is a
-      // one-cell box, which is how Alt-click deletes a single note.
+    if (e.altKey || eraseMode) {
+      // Alt-press (or the touch erase-mode toggle) starts an erase box. A
+      // press with no movement is a one-cell box, which is how Alt-click /
+      // an erase-mode tap deletes a single note.
+      capture(e);
       setDrag({ kind: 'erase', from: cell, to: cell });
       return;
     }
 
+    if (e.pointerType === 'touch') {
+      // Defer note creation until pointerup confirms this was a tap, not a
+      // swipe. The surface's touch-action lets a real drag scroll natively
+      // instead of reaching this handler at all in most cases; this is the
+      // fallback for drags too small for the browser to treat as a pan.
+      pendingTapRef.current = { cell, x: e.clientX, y: e.clientY };
+      return;
+    }
+
+    capture(e);
     const note: MelodyNote = { pitch: cell.pitch, start: cell.step, length: 1 };
     const next = addMelodyNote(lane, note); // monophonic: trims whatever it lands on
     onChange(next);
@@ -169,13 +234,14 @@ export function MelodyLane({
   };
 
   const handleNotePointerDown = (e: React.PointerEvent, index: number, note: MelodyNote) => {
-    // Alt is the erase modifier everywhere, so let it fall through to the
-    // surface handler and start a box there instead of grabbing the note.
-    if (e.altKey) return;
+    // Alt (or touch erase mode) is the erase modifier everywhere, so let it
+    // fall through to the surface handler and start a box there instead of
+    // grabbing the note.
+    if (e.altKey || eraseMode) return;
     e.stopPropagation();
     capture(e);
     const rect = (e.target as HTMLElement).getBoundingClientRect();
-    const onGrip = e.clientX >= rect.right - RESIZE_GRIP_PX;
+    const onGrip = e.clientX >= rect.right - resizeGripPx;
     if (onGrip) {
       setDrag({ kind: 'resize', index });
       return;
@@ -186,6 +252,15 @@ export function MelodyLane({
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
+    if (pendingTapRef.current) {
+      const { x, y } = pendingTapRef.current;
+      if (Math.abs(e.clientX - x) > TAP_SLOP_PX || Math.abs(e.clientY - y) > TAP_SLOP_PX) {
+        // Past the slop: this is a swipe, not a tap. Drop it and let the
+        // browser's native pan (or the user's own further motion) own it.
+        pendingTapRef.current = null;
+      }
+    }
+
     const cell = pointToCell(e.clientX, e.clientY);
 
     if (!drag) {
@@ -218,7 +293,19 @@ export function MelodyLane({
     onChange({ ...lane, notes });
   };
 
-  const handlePointerUp = () => {
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (pendingTapRef.current) {
+      const pending = pendingTapRef.current;
+      pendingTapRef.current = null;
+      // Only a genuine pointerup confirms a tap; a cancel means the browser
+      // took the gesture over as a scroll, so nothing should be written.
+      if (e.type === 'pointerup') {
+        const note: MelodyNote = { pitch: pending.cell.pitch, start: pending.cell.step, length: 1 };
+        onChange(addMelodyNote(lane, note));
+        onAuditionPitch(pending.cell.pitch);
+      }
+      return;
+    }
     if (drag?.kind === 'erase') {
       const lowStep = Math.min(drag.from.step, drag.to.step);
       const highStep = Math.max(drag.from.step, drag.to.step);
@@ -270,8 +357,8 @@ export function MelodyLane({
       ? {
           left: Math.min(drag.from.step, drag.to.step) * stepW,
           width: (Math.abs(drag.to.step - drag.from.step) + 1) * stepW,
-          top: rowForPitch(Math.max(drag.from.pitch, drag.to.pitch)) * ROW_H,
-          height: (Math.abs(drag.to.pitch - drag.from.pitch) + 1) * ROW_H,
+          top: rowForPitch(Math.max(drag.from.pitch, drag.to.pitch)) * rowH,
+          height: (Math.abs(drag.to.pitch - drag.from.pitch) + 1) * rowH,
         }
       : null;
 
@@ -285,7 +372,7 @@ export function MelodyLane({
               key={row}
               type="button"
               className={`tp-lane__key${pitch % 12 === 0 ? ' tp-lane__key--tonic' : ''}${focusClass('key', pitch)}`}
-              style={{ height: ROW_H }}
+              style={{ height: rowH }}
               onClick={() => onAuditionPitch(pitch)}
               tabIndex={-1}
               aria-label={`Hear ${rowLabel(pitch)}`}
@@ -296,11 +383,14 @@ export function MelodyLane({
         })}
       </div>
 
-      <div className="tp-lane__scroll">
+      <div className="tp-lane__scroll" ref={scrollRef}>
         <div
-          className={`tp-lane__surface${drag?.kind === 'erase' ? ' tp-lane__surface--erasing' : ''}`}
+          className={`tp-lane__surface${drag?.kind === 'erase' || eraseMode ? ' tp-lane__surface--erasing' : ''}`}
           ref={surfaceRef}
-          style={{ width, height }}
+          // On a coarse pointer the base touch-action (mobile-melody.css)
+          // lets a plain swipe pan the lane natively; erase mode takes that
+          // back so a fast erase-box drag can't be swallowed as a scroll.
+          style={{ width, height, touchAction: eraseMode ? 'none' : undefined }}
           onPointerDown={handleSurfacePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -312,7 +402,7 @@ export function MelodyLane({
               <div
                 key={row}
                 className={`tp-lane__row${pitch % 12 === 0 ? ' tp-lane__row--tonic' : ''}${focusClass('row', pitch)}`}
-                style={{ top: row * ROW_H, height: ROW_H, background: rowGradient(pitch) }}
+                style={{ top: row * rowH, height: rowH, background: rowGradient(pitch) }}
               />
             );
           })}
@@ -342,11 +432,11 @@ export function MelodyLane({
               style={{
                 left: note.start * stepW,
                 width: Math.max(1, note.length) * stepW - 1,
-                top: rowForPitch(note.pitch) * ROW_H,
-                height: ROW_H - 1,
+                top: rowForPitch(note.pitch) * rowH,
+                height: rowH - 1,
               }}
               onPointerDown={(e) => handleNotePointerDown(e, i, note)}
-              title={`${rowLabel(note.pitch)} · drag to move, drag the right edge to lengthen, alt-click to delete`}
+              title={`${rowLabel(note.pitch)} · drag to move, drag the right edge to lengthen, alt-click or erase mode to delete`}
             />
           ))}
 

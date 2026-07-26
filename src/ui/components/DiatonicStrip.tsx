@@ -62,7 +62,8 @@ export function DiatonicStrip({ keyValue, onAudition }: DiatonicStripProps) {
         <span className="tp-strip__eyebrow">In key</span>
         <ModifierBar value={mods} onToggle={toggle} ariaLabel="Chord modifiers" />
         <span className="tp-strip__hint" style={{ marginLeft: 'auto' }}>
-          click to hear · drag into the grid
+          <span className="tp-hint--fine">click to hear · drag into the grid</span>
+          <span className="tp-hint--coarse">tap to hear · hold, then drag into the grid</span>
         </span>
       </div>
       <div className="tp-strip__cells">

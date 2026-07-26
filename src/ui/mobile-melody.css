@@ -1,0 +1,163 @@
+/* Mobile / touch overrides for the melody lane (MelodySection, MelodyLane).
+   Loaded after theme.css so equal-specificity rules here win.
+   Owned by the melody work package; keep grid and page-chrome rules out. */
+
+/* ---------------------------------------------------------------------- */
+/* Section header                                                         */
+/*                                                                          */
+/* .tp-strip__header and .tp-strip__hint are shared with DiatonicStrip and */
+/* SuggestionStrip, so nothing here targets them directly. MelodySection   */
+/* adds its own .tp-melody-header / .tp-melody-hint classes alongside the  */
+/* shared ones and everything below is scoped through those.               */
+/*                                                                          */
+/* The bug this fixes: the header is a nowrap flex row with a long hint    */
+/* string pinned right via margin-left: auto. Once the fixed-width         */
+/* controls (resolution, mode, Generate, the slider, Clear) no longer fit  */
+/* a phone's width, nowrap can't drop the hint to its own line, so the     */
+/* flex algorithm instead squeezes it down to a sliver a few characters    */
+/* wide and lets its text wrap vertically — which is what actually pushes  */
+/* the lane hundreds of pixels down the page and makes it look broken,     */
+/* not the lane's own sizing. flex-wrap turns that squeeze into a normal   */
+/* reflow: each control drops to its own row instead of being crushed.     */
+/* ---------------------------------------------------------------------- */
+
+.tp-melody-hint {
+  margin-left: auto;
+}
+
+/* Two hint strings, one per input method: "click" and "drag to draw" are
+   meaningless on a phone (drag-to-draw is deliberately not touch behavior,
+   see the surface's touch-action below), so touch gets its own wording
+   rather than a diluted lowest-common-denominator sentence. */
+.tp-melody-hint--touch {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .tp-melody-hint {
+    display: none;
+  }
+
+  .tp-melody-hint--touch {
+    display: inline;
+  }
+}
+
+@media (max-width: 640px) {
+  .tp-melody-header {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .tp-melody-hint {
+    margin-left: 0;
+    flex: 1 1 100%;
+  }
+}
+
+/* Touch-sized hit targets for every header control. Scoped under
+   .tp-melody-header so this never reaches the diatonic/suggestion strips'
+   own headers, which share the underlying .tp-size-btn / .tp-btn classes. */
+@media (pointer: coarse) {
+  .tp-melody-header .tp-size-btn,
+  .tp-melody-header .tp-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .tp-melody-header .tp-size-group {
+    padding: 4px;
+  }
+
+  .tp-melody-header .tp-lane__slider {
+    min-height: 44px;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Surprise slider: a native range input's thumb is a mouse-sized target.  */
+/* Rebuilt at touch scale on coarse pointers only; the desktop thumb is    */
+/* left to the browser's own (already fine for a mouse) styling.          */
+/* ---------------------------------------------------------------------- */
+
+@media (pointer: coarse) {
+  .tp-lane__slider input[type='range'] {
+    width: 130px;
+    height: 32px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+  }
+
+  .tp-lane__slider input[type='range']::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--line);
+  }
+
+  .tp-lane__slider input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: var(--accent-surprise);
+    border: none;
+    /* Centers the 26px thumb on the 6px track. */
+    margin-top: -10px;
+  }
+
+  .tp-lane__slider input[type='range']::-moz-range-track {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--line);
+  }
+
+  .tp-lane__slider input[type='range']::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: var(--accent-surprise);
+    border: none;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Lane gestures                                                          */
+/*                                                                          */
+/* theme.css sets touch-action: none on the whole surface so a mouse drag  */
+/* can draw a note without the page trying to scroll underneath it. On a   */
+/* coarse pointer that also blocks the one gesture a phone needs most: a   */
+/* plain swipe to scroll. Split it instead — empty canvas gets its pan     */
+/* back (drawing there becomes tap-only, see MelodyLane's pointerType      */
+/* branch), notes keep touch-action: none so an in-progress move/resize    */
+/* drag can't be stolen by the browser mid-gesture.                       */
+/* ---------------------------------------------------------------------- */
+
+@media (pointer: coarse) {
+  .tp-lane__surface {
+    touch-action: pan-x pan-y;
+  }
+
+  .tp-lane__note {
+    touch-action: none;
+    /* Widen the resize-grip's visual cue to roughly match the larger grab
+       zone MelodyLane computes for coarse pointers (RESIZE_GRIP_PX_COARSE). */
+    box-shadow: inset -10px 0 0 rgba(0, 0, 0, 0.25);
+  }
+
+  /* A 1/16 note can be a handful of pixels wide. The visible note stays
+     exactly that thin (the grid alignment with the chord track above it is
+     not negotiable); a transparent, larger hit area layered over it is. */
+  .tp-lane__note::before {
+    content: '';
+    position: absolute;
+    inset: -6px -5px;
+  }
+
+  /* Rows grow (MelodyLane's ROW_H_COARSE) to give a fingertip a fighting
+     chance at the right pitch; the label can afford to grow with them. */
+  .tp-lane__key {
+    font-size: 10.5px;
+  }
+}
