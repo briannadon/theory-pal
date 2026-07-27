@@ -40,3 +40,6 @@ docs/
 # Browser-automation scratch
 .playwright/
 .playwright-cli/
+
+# Local agent config
+.claude/
