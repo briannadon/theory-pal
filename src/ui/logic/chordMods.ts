@@ -1,4 +1,5 @@
-// Translating between a chord and the modifier toggles the UI shows for it.
+// Translating between a chord and the controls the chord editor shows for it:
+// the modifier toggles, the quality row, and the degree grid.
 //
 // The awkward part this hides: sus lives in two places. `sus2`, `sus4` and
 // `dom7sus4` are members of the closed `ChordQuality` vocabulary (the model
@@ -13,9 +14,12 @@
 // than setting a flag (see `withSeventh`).
 import {
   chordShape,
+  hasSeventh,
+  qualityAtDegree,
   withSeventh,
   withoutSeventh,
   type ChordMods,
+  type ChordQuality,
   type Key,
   type RelChord,
 } from '../../theory/index.ts';
@@ -81,6 +85,45 @@ export function toggleModifier(chord: RelChord, key: Key, modifier: ChordModifie
   }
   const { mods: _dropped, ...rest } = normalized;
   return Object.keys(mods).length > 0 ? { ...rest, mods } : rest;
+}
+
+/**
+ * Move a chord to another chromatic degree, keeping everything about it that
+ * is not tied to its root.
+ *
+ * The quality *is* tied to the root — vii° is diminished because of where it
+ * sits, not because the user asked for a diminished chord — so it re-snaps to
+ * whatever that degree naturally takes in this key (`qualityAtDegree`), which
+ * is why picking VII in C major gives vii° rather than VII. Whether the chord
+ * has a seventh is a separate choice the user already made, so it survives the
+ * move and is re-derived for the new degree: V7 dragged to IV becomes IVmaj7,
+ * not a IV triad and not a IV dominant. Extensions ride along untouched.
+ */
+export function setDegree(chord: RelChord, key: Key, degree: number): RelChord {
+  const normalized = normalizeChord(chord);
+  const moved: RelChord = { ...normalized, degree, quality: qualityAtDegree(key, degree) };
+  return hasSeventh(normalized.quality) ? withSeventh(moved, key) : moved;
+}
+
+/** The base quality the quality row shows as selected: sus spelled in the
+ * quality slot is a modifier as far as this editor is concerned, so it reports
+ * the triad or seventh underneath it. */
+export function baseQuality(chord: RelChord): ChordQuality {
+  return normalizeChord(chord).quality;
+}
+
+/**
+ * Set the chord's quality outright — the one edit that is *not* re-derived
+ * from the key, because it is the user overruling what the degree implies
+ * (a major III in a minor key, a dim7 anywhere).
+ *
+ * Sevenths live in the quality vocabulary rather than in `mods`, so choosing a
+ * triad here drops the seventh and choosing a seventh adds one; that is the
+ * same control the 7 toggle drives, and they stay consistent because both read
+ * back through `modifierState`.
+ */
+export function setQuality(chord: RelChord, quality: ChordQuality): RelChord {
+  return { ...normalizeChord(chord), quality };
 }
 
 export { NO_MODIFIERS };

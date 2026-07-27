@@ -82,14 +82,14 @@
     inset: -14px;
   }
 
-  /* The mods button already spans the tile's full width, so it only needs
+  /* The edit button already spans the tile's full width, so it only needs
      more height, not width — growing sideways would just steal touches from
      the grips on either edge. */
-  .grid-slot__mods-btn {
+  .grid-slot__edit-btn {
     position: relative;
   }
 
-  .grid-slot__mods-btn::before {
+  .grid-slot__edit-btn::before {
     content: '';
     position: absolute;
     inset: -12px 0;
@@ -97,7 +97,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Modifier popover: keep it inside the viewport at any size, and turn */
+/* Chord-editor popover: keep it inside the viewport at any size, and   */
 /* it into a bottom sheet once the screen is too narrow to float one   */
 /* beside the tile that opened it.                                     */
 /* ------------------------------------------------------------------ */
@@ -156,6 +156,18 @@
     min-height: 44px;
     min-width: 44px;
     flex: 1 1 64px;
+  }
+
+  /* The degree grid keeps its six columns on touch — it is a chromatic
+     octave, and re-flowing it would scramble the one thing that makes it
+     scannable. Only the row height grows to a thumb-sized target. */
+  .chord-editor__degree {
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .chord-editor__duplicate {
+    min-height: 44px;
   }
 
   .grid-slot__popover-close {

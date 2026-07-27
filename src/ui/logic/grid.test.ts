@@ -5,6 +5,7 @@ import {
   chordAtBeat,
   clearSlot,
   createGrid,
+  duplicateSlot,
   parseSlotIndex,
   placeChord,
   reorderGrid,
@@ -413,6 +414,108 @@ describe('slotIndexEndingAt', () => {
       [null, 4],
       [null, 4],
     ]);
+  });
+});
+
+describe('duplicateSlot', () => {
+  it('copies into the empty space after the chord, taking only its own length', () => {
+    let g = createGrid(4);
+    g = setSlot(g, 0, IV);
+    g = duplicateSlot(g, 0);
+    expect(shape(g)).toEqual([
+      [IV, 4],
+      [IV, 4],
+      [null, 4],
+      [null, 4],
+    ]);
+  });
+
+  it('leaves the rest of a long gap empty rather than swallowing it', () => {
+    let g = createGrid(4);
+    g = setSlot(g, 0, IV);
+    g = resizeSlot(g, 0, 1); // a 1-beat stab, then 7 beats of space
+    g = duplicateSlot(g, 0);
+    expect(shape(g).slice(0, 3)).toEqual([
+      [IV, 1],
+      [IV, 1],
+      [null, 6],
+    ]);
+  });
+
+  it('fills a gap shorter than the chord without growing it', () => {
+    let g = createGrid(4);
+    g = setSlot(g, 0, IV); // 4 beats
+    g = setSlot(g, 1, V);
+    g = setSlotStart(g, 1, 6); // V starts late, leaving 2 beats of space
+    g = duplicateSlot(g, 0);
+    expect(shape(g)).toEqual([
+      [IV, 4],
+      [IV, 2],
+      [V, 2],
+      [null, 4],
+      [null, 4],
+    ]);
+  });
+
+  it('splits the chord in two when the next slot is filled', () => {
+    let g = createGrid(4);
+    g = setSlot(g, 0, IV);
+    g = setSlot(g, 1, V);
+    g = duplicateSlot(g, 0);
+    expect(shape(g)).toEqual([
+      [IV, 2],
+      [IV, 2],
+      [V, 4],
+      [null, 4],
+      [null, 4],
+    ]);
+  });
+
+  it('splits the last slot, which has nothing after it at all', () => {
+    let g = createGrid(4);
+    for (let i = 0; i < 4; i++) g = setSlot(g, i, I);
+    g = duplicateSlot(g, 3);
+    expect(shape(g).slice(3)).toEqual([
+      [I, 2],
+      [I, 2],
+    ]);
+  });
+
+  it('rounds an odd split to the grid unit rather than shedding a sliver', () => {
+    const g: GridState = { size: 4, slots: [{ chord: IV, beats: 0.75 }, { chord: V, beats: 15.25 }] };
+    expect(shape(duplicateSlot(g, 0)).slice(0, 2)).toEqual([
+      [IV, 0.5],
+      [IV, 0.25],
+    ]);
+  });
+
+  it('never changes the length of the timeline', () => {
+    let g = createGrid(4);
+    g = setSlot(g, 0, IV);
+    g = setSlot(g, 1, V);
+    g = resizeSlot(g, 1, 2);
+    for (const i of [0, 1, 2]) {
+      const dup = duplicateSlot(g, i);
+      expect(dup.slots.reduce((t, s) => t + s.beats, 0)).toBe(totalBeats(g));
+    }
+  });
+
+  it('copies the mods, and copies them by value', () => {
+    let g = createGrid(4);
+    g = setSlot(g, 0, { degree: 7, quality: 'dom7', mods: { ninth: true } });
+    g = duplicateSlot(g, 0);
+    expect(g.slots[1].chord).toEqual({ degree: 7, quality: 'dom7', mods: { ninth: true } });
+    expect(g.slots[1].chord?.mods).not.toBe(g.slots[0].chord?.mods);
+  });
+
+  it('does nothing to an empty slot, an out-of-range index, or a chord too short to split', () => {
+    // At the minimum length with a chord next door: no gap to copy into and no
+    // middle to split.
+    const g: GridState = { size: 4, slots: [{ chord: IV, beats: 0.25 }, { chord: V, beats: 15.75 }] };
+    expect(duplicateSlot(g, 0)).toBe(g);
+    const empty = createGrid(4);
+    expect(duplicateSlot(empty, 0)).toBe(empty);
+    expect(duplicateSlot(empty, 99)).toBe(empty);
   });
 });
 

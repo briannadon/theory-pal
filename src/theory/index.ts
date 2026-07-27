@@ -13,6 +13,7 @@ export {
   toRelative,
   isDiatonic,
   diatonicChords,
+  qualityAtDegree,
   chordPitches,
   chordIntervals,
   chordShape,

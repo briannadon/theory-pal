@@ -245,6 +245,41 @@ export function placeChord(
   return setSlot(capped ? splitSlot(state, index, maxBeats) : state, index, chord);
 }
 
+/**
+ * Copy the chord at `index` onto the timeline next to itself. The timeline is
+ * a fixed length, so there is nowhere to *insert* it — the copy has to come
+ * out of somewhere, and there are only two somewheres:
+ *
+ * - the empty space right after the chord, if there is any. The copy takes as
+ *   much of it as the original is long and leaves the rest empty, so
+ *   duplicating a 1-beat stab into 4 beats of space gives one stab and 3 beats
+ *   of room, not a 4-beat chord nobody asked for. A gap shorter than the
+ *   original just gets filled.
+ * - otherwise the chord's own span, halved: the slot becomes two copies of
+ *   itself back to back. Nothing else on the timeline moves either way.
+ *
+ * Only the *immediately* following slot counts as space. Scanning forward for
+ * the nearest hole would drop the copy somewhere the user isn't looking, and
+ * "next to itself" is the whole gesture.
+ */
+export function duplicateSlot(state: GridState, index: number): GridState {
+  if (index < 0 || index >= state.slots.length) return state;
+  const slot = state.slots[index];
+  if (!slot.chord) return state;
+  const copy: RelChord = { ...slot.chord, ...(slot.chord.mods ? { mods: { ...slot.chord.mods } } : {}) };
+
+  const next = state.slots[index + 1];
+  if (next && next.chord === null) return placeChord(state, index + 1, copy, slot.beats);
+
+  // No room after it: split it down the middle. A slot already at the minimum
+  // has no middle to split, and stays as it is.
+  const at = quantize(slot.beats / 2);
+  if (at < MIN_SLOT_BEATS || quantize(slot.beats - at) < MIN_SLOT_BEATS) return state;
+  const slots = state.slots.slice();
+  slots.splice(index, 1, { ...slot, beats: at }, { chord: copy, beats: quantize(slot.beats - at) });
+  return { ...state, slots };
+}
+
 /** Split a slot in two at `beats` from its start, leaving the remainder empty.
  * Not currently wired to a gesture, but it is the operation a double-click or
  * a "split" key would run, and resizeSlot's shrink path is defined in terms of

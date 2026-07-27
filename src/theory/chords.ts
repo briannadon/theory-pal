@@ -412,6 +412,43 @@ export function diatonicChords(key: Key, sevenths = false): RelChord[] {
 }
 
 /**
+ * The triad quality a chromatic degree takes when nothing else says otherwise,
+ * for degrees the key's own scale doesn't supply. These are the borrowing
+ * conventions, not arbitrary defaults: bIII, bVI and bVII come from the
+ * parallel minor as major triads; bII is the Neapolitan, also major; #IV and
+ * VII are the two that lead upward by half step and are diminished when they
+ * are not diatonic (#iv° in major, vii° over a minor key's dominant). The rest
+ * default to major, which is what a chromatic root usually is when it is
+ * functioning as a secondary dominant (III = V/vi, II = V/V, VI = V/ii).
+ */
+const CHROMATIC_DEFAULT: ChordQuality[] = [
+  'maj', // I
+  'maj', // bII — Neapolitan
+  'maj', // II  — V/V
+  'maj', // bIII
+  'maj', // III — V/vi
+  'maj', // IV
+  'dim', // #IV
+  'maj', // V
+  'maj', // bVI
+  'maj', // VI  — V/ii
+  'maj', // bVII
+  'dim', // VII
+];
+
+/**
+ * The quality to give a chord when only its root has been chosen — the key's
+ * own quality for that degree when the scale has one, and the borrowing
+ * convention above when it doesn't. Always a triad: sevenths and extensions
+ * are separate decisions layered on top (see `withSeventh` and `ChordMods`).
+ */
+export function qualityAtDegree(key: Key, degree: number): ChordQuality {
+  const d = mod12(degree);
+  const diatonic = diatonicChords(key, false).find((c) => c.degree === d);
+  return diatonic ? diatonic.quality : CHROMATIC_DEFAULT[d];
+}
+
+/**
  * Whether `c` matches one of the key's naturally-occurring diatonic triads or
  * 7th chords (checked against whichever family its own quality belongs to). Sus
  * chords are never tertian-diatonic, so they always report false.

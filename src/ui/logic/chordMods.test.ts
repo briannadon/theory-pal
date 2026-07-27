@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { chordName, toAbsolute, type Key, type RelChord } from '../../theory/index.ts';
-import { modifierState, normalizeChord, toggleModifier } from './chordMods.ts';
+import {
+  baseQuality,
+  modifierState,
+  normalizeChord,
+  setDegree,
+  setQuality,
+  toggleModifier,
+} from './chordMods.ts';
 
 const cMajor: Key = { tonic: 0, scale: 'ionian' };
 const name = (c: RelChord) => chordName(toAbsolute(c, cMajor));
@@ -101,5 +108,86 @@ describe('toggleModifier', () => {
       const there = toggleModifier(chord, cMajor, mod);
       expect(toggleModifier(there, cMajor, mod)).toEqual(chord);
     }
+  });
+});
+
+describe('setDegree', () => {
+  const aMinor: Key = { tonic: 9, scale: 'aeolian' };
+
+  it('re-snaps the quality to what the new degree takes in this key', () => {
+    // The point of the rule: vii° is diminished because of where it sits, so
+    // moving a major I chord onto VII gives the key's own vii°, not VII major.
+    expect(setDegree({ degree: 0, quality: 'maj' }, cMajor, 11)).toEqual({
+      degree: 11,
+      quality: 'dim',
+    });
+    expect(setDegree({ degree: 0, quality: 'maj' }, cMajor, 9)).toEqual({
+      degree: 9,
+      quality: 'min',
+    });
+  });
+
+  it('borrows a quality for the chromatic degrees the key has no chord on', () => {
+    expect(name(setDegree({ degree: 0, quality: 'maj' }, cMajor, 8))).toBe('Ab'); // bVI
+    expect(setDegree({ degree: 0, quality: 'maj' }, cMajor, 6).quality).toBe('dim'); // #iv°
+  });
+
+  it('keeps a seventh across the move, re-derived for the new degree', () => {
+    // V7 (dominant) landing on IV becomes IVmaj7, which is the 7th C major
+    // actually has there — not a dominant transplanted from where it came from.
+    expect(setDegree({ degree: 7, quality: 'dom7' }, cMajor, 5)).toEqual({
+      degree: 5,
+      quality: 'maj7',
+    });
+    // And a triad stays a triad.
+    expect(setDegree({ degree: 7, quality: 'maj' }, cMajor, 5).quality).toBe('maj');
+  });
+
+  it('carries the modifiers untouched', () => {
+    const moved = setDegree({ degree: 0, quality: 'maj', mods: { ninth: true } }, cMajor, 3);
+    expect(moved).toEqual({ degree: 3, quality: 'maj', mods: { ninth: true } });
+  });
+
+  it('reads a sus spelled as a quality as the modifier it is', () => {
+    const moved = setDegree({ degree: 0, quality: 'sus4' }, cMajor, 7);
+    expect(moved).toEqual({ degree: 7, quality: 'maj', mods: { sus4: true } });
+    expect(modifierState(moved).sus4).toBe(true);
+  });
+
+  it('answers to the mode rather than to the major scale', () => {
+    expect(setDegree({ degree: 0, quality: 'min' }, aMinor, 5).quality).toBe('min'); // iv
+    expect(setDegree({ degree: 0, quality: 'min' }, { tonic: 2, scale: 'dorian' }, 5).quality).toBe(
+      'maj',
+    ); // dorian's major IV
+  });
+
+  it('is idempotent on the degree the chord is already on, once snapped', () => {
+    const snapped = setDegree({ degree: 0, quality: 'maj' }, cMajor, 11);
+    expect(setDegree(snapped, cMajor, 11)).toEqual(snapped);
+  });
+});
+
+describe('setQuality / baseQuality', () => {
+  it('overrules what the degree implies', () => {
+    expect(setQuality({ degree: 0, quality: 'maj' }, 'aug')).toEqual({ degree: 0, quality: 'aug' });
+  });
+
+  it('reports the quality under a sus, whichever way the sus is spelled', () => {
+    expect(baseQuality({ degree: 7, quality: 'dom7sus4' })).toBe('dom7');
+    expect(baseQuality({ degree: 7, quality: 'dom7', mods: { sus4: true } })).toBe('dom7');
+    expect(baseQuality({ degree: 0, quality: 'sus2' })).toBe('maj');
+  });
+
+  it('moves the seventh with the quality, and the 7 toggle agrees', () => {
+    expect(modifierState(setQuality({ degree: 0, quality: 'maj' }, 'maj7')).seventh).toBe(true);
+    expect(modifierState(setQuality({ degree: 0, quality: 'maj7' }, 'min')).seventh).toBe(false);
+  });
+
+  it('keeps the modifiers, and normalizes a sus quality into them first', () => {
+    expect(setQuality({ degree: 0, quality: 'sus4', mods: { ninth: true } }, 'min')).toEqual({
+      degree: 0,
+      quality: 'min',
+      mods: { ninth: true, sus4: true },
+    });
   });
 });

@@ -38,6 +38,7 @@ import {
   BEATS_PER_BAR,
   clearSlot,
   createGrid,
+  duplicateSlot,
   parseSlotIndex,
   placeChord,
   reorderGrid,
@@ -370,6 +371,7 @@ export function TheoryPal() {
             onAuditionSlot={handleAudition}
             onClearSlot={(idx: number) => setGrid((g) => clearSlot(g, idx))}
             onModifySlot={handleModifySlot}
+            onDuplicateSlot={(idx: number) => setGrid((g) => duplicateSlot(g, idx))}
             onHoverSlot={setHoveredSlot}
             onResizeSlot={(idx: number, beats: number) =>
               setGrid((g) => resizeSlot(g, idx, beats))

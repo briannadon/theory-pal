@@ -3,10 +3,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Key, RelChord } from '../../theory/index.ts';
-import { modifierState, toggleModifier } from '../logic/chordMods.ts';
 import { beatsLabel, BEATS_PER_BAR, MIN_SLOT_BEATS, type Division } from '../logic/grid.ts';
 import { ChordFace, type ChordAccent } from './ChordFace.tsx';
-import { ModifierBar, type ChordModifier } from './ModifierBar.tsx';
+import { ChordEditor, type DuplicateMode } from './ChordEditor.tsx';
 
 export interface GridSlotProps {
   id: string;
@@ -18,9 +17,15 @@ export interface GridSlotProps {
   isPlaying: boolean;
   onAudition: () => void;
   onClear: () => void;
-  /** The key decides what "add the 7th" means for this degree. */
+  /** The key decides what "add the 7th" means for this degree, and which
+   * quality each degree of the chord editor's grid naturally takes. */
   keyValue: Key;
   onModifyChord?: (chord: RelChord) => void;
+  /** Copy this chord next to itself. What that means depends on whether there
+   * is empty space after it, which only the grid can see — hence the mode,
+   * which the editor's button uses to say in advance what will happen. */
+  onDuplicate?: () => void;
+  duplicateMode?: DuplicateMode;
   /** Hovering a chord tile resolves the melody lane to that chord — see
    * MelodyLane. Reported here rather than derived there so both the tile and
    * the lane's own bar segment drive the same highlight. */
@@ -67,6 +72,8 @@ export function GridSlot({
   onClear,
   keyValue,
   onModifyChord,
+  onDuplicate,
+  duplicateMode,
   onHoverChange,
   start,
   beats,
@@ -80,7 +87,7 @@ export function GridSlot({
   onSelect,
   onSuggestHere,
 }: GridSlotProps) {
-  const [modsOpen, setModsOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -109,7 +116,7 @@ export function GridSlot({
   }, []);
 
   useLayoutEffect(() => {
-    if (!modsOpen) {
+    if (!editorOpen) {
       setPos(null);
       return;
     }
@@ -122,21 +129,21 @@ export function GridSlot({
       window.removeEventListener('scroll', place, true);
       window.removeEventListener('resize', place);
     };
-  }, [modsOpen, place]);
+  }, [editorOpen, place]);
 
   // Click anywhere else — including another slot's button — closes this one.
   // Pointerdown rather than click so the popover is gone before whatever was
   // clicked reacts, and Escape for the keyboard. The panel is portalled, so it
   // is not inside popoverRef and has to be tested separately.
   useEffect(() => {
-    if (!modsOpen) return;
+    if (!editorOpen) return;
     const onPointerDown = (e: PointerEvent) => {
       const target = e.target as Node;
       if (popoverRef.current?.contains(target) || panelRef.current?.contains(target)) return;
-      setModsOpen(false);
+      setEditorOpen(false);
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setModsOpen(false);
+      if (e.key === 'Escape') setEditorOpen(false);
     };
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
@@ -144,7 +151,7 @@ export function GridSlot({
       document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [modsOpen]);
+  }, [editorOpen]);
   // Slot ids/keys are positional (`slot-0`…`slot-n`), so a reorder moves the
   // chord *content* between DOM nodes that themselves never move. dnd-kit's
   // default layout animation doesn't know that: on drop it measures the "new"
@@ -299,22 +306,22 @@ export function GridSlot({
         </button>
       )}
       {chord && onModifyChord && (
-        <div className="grid-slot__mods" ref={popoverRef}>
+        <div className="grid-slot__edit" ref={popoverRef}>
           <button
             type="button"
             ref={btnRef}
-            className="grid-slot__mods-btn"
-            aria-expanded={modsOpen}
-            aria-label={`Modifiers for the chord at bar ${position}`}
+            className="grid-slot__edit-btn"
+            aria-expanded={editorOpen}
+            aria-label={`Edit the chord at bar ${position}`}
             onClick={(e) => {
               e.stopPropagation();
-              setModsOpen((open) => !open);
+              setEditorOpen((open) => !open);
             }}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            mods
+            edit
           </button>
-          {modsOpen &&
+          {editorOpen &&
             createPortal(
               <div
                 className="grid-slot__popover"
@@ -331,22 +338,34 @@ export function GridSlot({
                     above), but that's invisible until you find it by accident on
                     a phone — an explicit close control is the one a thumb can see. */}
                 <div className="grid-slot__popover-head">
-                  <span className="grid-slot__popover-title">Modifiers</span>
+                  <span className="grid-slot__popover-title">Chord · bar {position}</span>
                   <button
                     type="button"
                     className="grid-slot__popover-close"
-                    aria-label="Close modifiers"
-                    onClick={() => setModsOpen(false)}
+                    aria-label="Close the chord editor"
+                    onClick={() => setEditorOpen(false)}
                   >
                     ×
                   </button>
                 </div>
-                <ModifierBar
-                  value={modifierState(chord)}
-                  onToggle={(modifier: ChordModifier) =>
-                    onModifyChord(toggleModifier(chord, keyValue, modifier))
+                <ChordEditor
+                  chord={chord}
+                  keyValue={keyValue}
+                  onChange={onModifyChord}
+                  // Duplicating re-cuts the slots this panel is anchored to,
+                  // and in the split case the tile under it becomes half its
+                  // width — so the panel gets out of the way rather than
+                  // hovering over a layout that no longer matches it.
+                  onDuplicate={
+                    onDuplicate
+                      ? () => {
+                          setEditorOpen(false);
+                          onDuplicate();
+                        }
+                      : undefined
                   }
-                  ariaLabel={`Modifiers for the chord at bar ${position}`}
+                  duplicateMode={duplicateMode}
+                  position={position}
                 />
               </div>,
               document.body,

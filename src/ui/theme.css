@@ -920,13 +920,13 @@
   background: var(--bg-3);
 }
 
-/* The modifier popover: a small "mods" button under each filled slot that
-   opens the same toggle bar the in-key strip uses. */
-.grid-slot__mods {
+/* The chord editor's handle: a small "edit" button under each filled slot,
+   opening the panel that holds degree, quality, modifiers and duplicate. */
+.grid-slot__edit {
   position: relative;
 }
 
-.grid-slot__mods-btn {
+.grid-slot__edit-btn {
   all: unset;
   cursor: pointer;
   display: block;
@@ -942,8 +942,8 @@
   padding: 3px 0;
 }
 
-.grid-slot__mods-btn:hover,
-.grid-slot__mods-btn[aria-expanded='true'] {
+.grid-slot__edit-btn:hover,
+.grid-slot__edit-btn[aria-expanded='true'] {
   color: var(--ink);
   background: var(--bg-3);
 }
@@ -1021,8 +1021,115 @@
   flex-wrap: nowrap;
 }
 
+/* The chord editor inside that popover: degree, quality, modifiers, duplicate.
+   Sections are separated by a rule rather than by space alone — the three rows
+   are different kinds of choice (where the chord sits, what it is, what is
+   stacked on it) and they read as one long wall of buttons otherwise. */
+.chord-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px;
+}
+
+.chord-editor__section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chord-editor__section + .chord-editor__section {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.chord-editor__label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* Six across, twice — the chromatic octave splits evenly, and a 12-wide row
+   would be wider than most viewports the popover has to fit inside. */
+.chord-editor__degrees {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(46px, 1fr));
+  gap: 3px;
+}
+
+.chord-editor__degree {
+  all: unset;
+  cursor: pointer;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 2px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg-1);
+  text-align: center;
+}
+
+.chord-editor__degree:hover {
+  background: var(--bg-3);
+  border-color: var(--ink-faint);
+}
+
+/* The degree this chord is already on. Same accent the in-key strip uses, so
+   "where the chord is" is the same color wherever it is shown. */
+.chord-editor__degree[aria-pressed='true'] {
+  border-color: var(--accent-diatonic);
+  background: color-mix(in srgb, var(--accent-diatonic) 16%, transparent);
+}
+
+.chord-editor__degree-roman {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink);
+}
+
+.chord-editor__degree-name {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-faint);
+}
+
+.chord-editor__duplicate {
+  all: unset;
+  cursor: pointer;
+  box-sizing: border-box;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg-1);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink);
+}
+
+.chord-editor__duplicate:hover {
+  background: var(--bg-3);
+  border-color: var(--accent-diatonic);
+}
+
+/* What duplicating will do to the timeline, said before it happens: the copy
+   has to come out of the gap after the chord or out of the chord itself, and
+   which one it is depends on the neighbor. */
+.chord-editor__duplicate-mode {
+  font-size: 9px;
+  color: var(--ink-faint);
+}
+
 /* How long this chord lasts, in beats — the number the grip is setting.
-   Inside the chord face rather than under it, where the mods button lives. */
+   Inside the chord face rather than under it, where the edit button lives. */
 .grid-slot__beats {
   position: absolute;
   top: 54px;
@@ -1071,7 +1178,7 @@
 .grid-slot--tiny .chord-face__roman,
 .grid-slot--tiny .chord-face__placeholder,
 .grid-slot--tiny .grid-slot__beats,
-.grid-slot--tiny .grid-slot__mods-btn {
+.grid-slot--tiny .grid-slot__edit-btn {
   display: none;
 }
 
@@ -1085,7 +1192,7 @@
   padding-right: 4px;
 }
 
-.grid-slot--narrow .grid-slot__mods-btn {
+.grid-slot--narrow .grid-slot__edit-btn {
   font-size: 8px;
 }
 

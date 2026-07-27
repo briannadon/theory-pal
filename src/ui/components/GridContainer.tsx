@@ -39,6 +39,7 @@ export interface GridContainerProps {
   onAuditionSlot: (chord: RelChord) => void;
   onClearSlot: (index: number) => void;
   onModifySlot?: (index: number, chord: RelChord) => void;
+  onDuplicateSlot?: (index: number) => void;
   onHoverSlot?: (index: number | null) => void;
   onResizeSlot?: (index: number, beats: number) => void;
   onSetSlotStart?: (index: number, start: number) => void;
@@ -68,6 +69,7 @@ export function GridContainer({
   onAuditionSlot,
   onClearSlot,
   onModifySlot,
+  onDuplicateSlot,
   onHoverSlot,
   onResizeSlot,
   onSetSlotStart,
@@ -211,6 +213,12 @@ export function GridContainer({
                     onClear={() => onClearSlot(i)}
                     keyValue={keyValue}
                     onModifyChord={(next) => onModifySlot?.(i, next)}
+                    onDuplicate={onDuplicateSlot ? () => onDuplicateSlot(i) : undefined}
+                    // Where the copy goes, decided here because only the grid
+                    // can see the slot next door (see `duplicateSlot`).
+                    duplicateMode={
+                      state.slots[i + 1] && state.slots[i + 1].chord === null ? 'gap' : 'split'
+                    }
                     onHoverChange={(hovering) => onHoverSlot?.(hovering ? i : null)}
                     start={starts[i]}
                     beats={slot.beats}

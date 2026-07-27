@@ -10,6 +10,7 @@ import {
   diatonicChords,
   isDiatonic,
   parseStateKey,
+  qualityAtDegree,
   QUALITY_INTERVALS,
   stateKey,
   toAbsolute,
@@ -326,5 +327,52 @@ describe('chord modifiers', () => {
     expect(withoutSeventh({ degree: 0, quality: 'maj' }).quality).toBe('maj'); // already a triad
     expect(hasSeventh('m7b5')).toBe(true);
     expect(hasSeventh('sus2')).toBe(false);
+  });
+});
+
+describe('qualityAtDegree', () => {
+  const cMajor: Key = { tonic: 0, scale: 'ionian' };
+  const aMinor: Key = { tonic: 9, scale: 'aeolian' };
+  const dDorian: Key = { tonic: 2, scale: 'dorian' };
+
+  it('gives the key its own quality wherever the scale has one', () => {
+    for (const key of [cMajor, aMinor, dDorian]) {
+      for (const rc of diatonicChords(key)) {
+        expect(qualityAtDegree(key, rc.degree)).toBe(rc.quality);
+      }
+    }
+  });
+
+  it('follows the mode, not the major scale: dorian IV is major, aeolian IV is minor', () => {
+    expect(qualityAtDegree(dDorian, 5)).toBe('maj');
+    expect(qualityAtDegree(aMinor, 5)).toBe('min');
+  });
+
+  it('borrows from the parallel minor for the flat degrees a major key lacks', () => {
+    expect(qualityAtDegree(cMajor, 3)).toBe('maj'); // bIII
+    expect(qualityAtDegree(cMajor, 8)).toBe('maj'); // bVI
+    expect(qualityAtDegree(cMajor, 10)).toBe('maj'); // bVII
+    expect(qualityAtDegree(cMajor, 1)).toBe('maj'); // bII, the Neapolitan
+  });
+
+  it('makes the two upward-leading chromatic degrees diminished', () => {
+    expect(qualityAtDegree(cMajor, 6)).toBe('dim'); // #iv° in a major key
+    expect(qualityAtDegree(aMinor, 11)).toBe('dim'); // vii° over a minor key's dominant
+  });
+
+  it('answers for any integer, in or out of an octave', () => {
+    for (const key of [cMajor, aMinor]) {
+      for (let d = -24; d <= 24; d++) {
+        expect(qualityAtDegree(key, d)).toBe(qualityAtDegree(key, ((d % 12) + 12) % 12));
+      }
+    }
+  });
+
+  it('is always a triad — sevenths are a separate decision', () => {
+    for (const key of [cMajor, aMinor, dDorian]) {
+      for (let d = 0; d < 12; d++) {
+        expect(hasSeventh(qualityAtDegree(key, d))).toBe(false);
+      }
+    }
   });
 });
