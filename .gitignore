@@ -29,3 +29,14 @@ data/.cache/
 data/__pycache__/
 data/**/__pycache__/
 data/.pytest_cache/
+
+# Working docs: kept on disk, not in the repo. README.md is the only markdown
+# this project ships (data/README.md documents the pipeline alongside it).
+HANDOFF.md
+PLAN.md
+SPEC.md
+docs/
+
+# Browser-automation scratch
+.playwright/
+.playwright-cli/
