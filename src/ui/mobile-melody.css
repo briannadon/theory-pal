@@ -10,20 +10,13 @@
 /* adds its own .tp-melody-header / .tp-melody-hint classes alongside the  */
 /* shared ones and everything below is scoped through those.               */
 /*                                                                          */
-/* The bug this fixes: the header is a nowrap flex row with a long hint    */
-/* string pinned right via margin-left: auto. Once the fixed-width         */
-/* controls (resolution, mode, Generate, the slider, Clear) no longer fit  */
-/* a phone's width, nowrap can't drop the hint to its own line, so the     */
-/* flex algorithm instead squeezes it down to a sliver a few characters    */
-/* wide and lets its text wrap vertically — which is what actually pushes  */
-/* the lane hundreds of pixels down the page and makes it look broken,     */
-/* not the lane's own sizing. flex-wrap turns that squeeze into a normal   */
-/* reflow: each control drops to its own row instead of being crushed.     */
+/* The hint now lives in the rail's legend block beside the label rather   */
+/* than pinned to the far right, so it no longer competes with the         */
+/* controls for width. What's left here is the wrap: once the fixed-width  */
+/* controls (resolution, zoom, mode, Generate, the fader, Clear) no longer */
+/* fit a phone's width, flex-wrap drops each to its own row instead of     */
+/* crushing them.                                                          */
 /* ---------------------------------------------------------------------- */
-
-.tp-melody-hint {
-  margin-left: auto;
-}
 
 /* Two hint strings, one per input method: "click" and "drag to draw" are
    meaningless on a phone (drag-to-draw is deliberately not touch behavior,
@@ -47,11 +40,6 @@
   .tp-melody-header {
     flex-wrap: wrap;
     row-gap: 8px;
-  }
-
-  .tp-melody-hint {
-    margin-left: 0;
-    flex: 1 1 100%;
   }
 }
 
@@ -84,41 +72,29 @@
   .tp-lane__slider input[type='range'] {
     width: 130px;
     height: 32px;
-    -webkit-appearance: none;
-    appearance: none;
-    background: transparent;
   }
 
   .tp-lane__slider input[type='range']::-webkit-slider-runnable-track {
     height: 6px;
-    border-radius: 999px;
-    background: var(--line);
   }
 
+  /* The same milled cap theme.css gives every fader, grown to a thumb. */
   .tp-lane__slider input[type='range']::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 26px;
-    height: 26px;
-    border-radius: 999px;
-    background: var(--accent-surprise);
-    border: none;
-    /* Centers the 26px thumb on the 6px track. */
-    margin-top: -10px;
+    width: 20px;
+    height: 28px;
+    border-radius: 3px;
+    /* Centers the 28px cap on the 6px track. */
+    margin-top: -11px;
   }
 
   .tp-lane__slider input[type='range']::-moz-range-track {
     height: 6px;
-    border-radius: 999px;
-    background: var(--line);
   }
 
   .tp-lane__slider input[type='range']::-moz-range-thumb {
-    width: 26px;
-    height: 26px;
-    border-radius: 999px;
-    background: var(--accent-surprise);
-    border: none;
+    width: 20px;
+    height: 28px;
+    border-radius: 3px;
   }
 }
 
@@ -143,7 +119,9 @@
     touch-action: none;
     /* Widen the resize-grip's visual cue to roughly match the larger grab
        zone MelodyLane computes for coarse pointers (RESIZE_GRIP_PX_COARSE). */
-    box-shadow: inset -10px 0 0 rgba(0, 0, 0, 0.25);
+    box-shadow:
+      inset -10px 0 0 rgba(0, 0, 0, 0.3),
+      0 0 7px rgba(111, 211, 154, 0.45);
   }
 
   /* A 1/16 note can be a handful of pixels wide. The visible note stays

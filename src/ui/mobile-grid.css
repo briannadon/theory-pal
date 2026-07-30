@@ -70,8 +70,8 @@
   }
 
   .grid-slot__grip:active {
-    background: var(--accent-diatonic);
-    opacity: 0.55;
+    background: var(--lamp-on);
+    opacity: 0.5;
   }
 
   /* The clear "x" is a 16px dot — fine for a cursor, not for a fingertip.
@@ -127,13 +127,6 @@
   margin-bottom: 6px;
 }
 
-.grid-slot__popover-title {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: var(--ink-faint);
-}
-
 .grid-slot__popover-close {
   all: unset;
   cursor: pointer;
@@ -147,8 +140,8 @@
 }
 
 .grid-slot__popover-close:hover {
-  color: var(--accent-danger);
-  background: var(--bg-3);
+  color: var(--lamp-danger);
+  background: rgba(0, 0, 0, 0.5);
 }
 
 @media (pointer: coarse) {
@@ -198,29 +191,29 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Header: grid size, chord-length snap, and Clear share one row that  */
-/* wraps badly once the two control groups and the hint text compete   */
-/* for space below ~480px. Reflow into eyebrow+Clear on top, each      */
-/* control group full-width below; drop the hint, which just repeats   */
-/* what the (now touch-sized) grips teach by feel.                     */
+/* Header: grid size, chord-length snap and Clear share the rail's     */
+/* right-hand group, which wraps badly once all three compete for      */
+/* width below ~480px. Reflow it into a two-column grid: Clear beside  */
+/* the first control group, each bank full-width below. The hint goes  */
+/* — it only repeats what the (now touch-sized) grips teach by feel.   */
 /* ------------------------------------------------------------------ */
 
 @media (max-width: 480px) {
-  .tp-grid__header {
+  .tp-grid__header .tp-rail__end {
     display: grid;
     grid-template-columns: 1fr auto;
     column-gap: 8px;
     row-gap: 8px;
     align-items: center;
+    width: 100%;
   }
 
-  .tp-grid__header .tp-btn {
+  .tp-grid__header .tp-rail__end .tp-btn {
     /* Grid's sparse auto-placement doesn't backtrack: once the size and
        division groups claim full rows below it, row 1's second column is
        skipped rather than filled. Pin Clear there explicitly. */
     grid-column: 2;
     grid-row: 1;
-    margin-left: 0 !important;
   }
 
   .tp-grid__header .tp-size-group {

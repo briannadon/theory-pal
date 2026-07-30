@@ -1,57 +1,115 @@
 /* theory-pal design tokens and component styles.
  *
- * Direction: a dark, instrument-panel interface — closer to a hardware synth
- * than a SaaS dashboard. Chord cells read as backlit keycaps/pads: a thin
- * top-edge accent line reports diatonic/borrowed/surprise status at a
- * glance (the app's core "identify borrowed chords instantly" requirement),
- * and probability is a small level-meter bar under the numeral rather than
- * a shouted badge — legible without competing with the chord symbol itself.
- * Committed to one dark theme rather than following OS light/dark
- * preference: a piece of instrument gear doesn't retheme itself either.
+ * Direction: the app is a piece of studio hardware. A graphite chassis with
+ * wood end cheeks, faceplates screwed onto it, and controls milled into
+ * recessed wells. Chord tiles are backlit keycaps: they sit proud of the
+ * panel, depress when pressed, and report their harmonic status through a
+ * lamp window rather than a border.
+ *
+ * The one rule that keeps it from becoming a light show: **color only ever
+ * means harmonic status.** Green = in key, amber = borrowed, violet = outside
+ * it, warm white = sounding right now. Everything else in the interface —
+ * buttons, borders, focus rings, panel chrome — is colorless metal. If a
+ * thing is colored, it is telling you something about the music.
+ *
+ * Committed to one dark theme rather than following OS light/dark preference:
+ * a piece of instrument gear doesn't retheme itself either.
  */
 
 :root {
-  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* IBM Plex: an industrial type program, three roles.
+     - legend: silkscreened panel legends, always uppercase and tracked out
+     - mono:   every chord symbol, numeral and measured value
+     - ui:     buttons, captions, running text */
+  --font-legend: 'IBM Plex Sans Condensed', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-ui: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
 
-  --bg-0: #0a0b0f;
-  --bg-1: #14161d;
-  --bg-2: #1c1f29;
-  --bg-3: #262a37;
-  --line: #2b2f3d;
-  --line-soft: #1f222c;
+  /* Chassis. Warm graphite rather than blue-black — it has to sit next to
+     wood without either one looking wrong. */
+  --void: #08090a;
+  --panel-top: #2e302b;
+  --panel-bot: #1d1f1c;
+  --panel-line: #000;
+  --well: #0a0b0c;
+  --edge: rgba(255, 255, 255, 0.075);
 
-  --ink: #edecf6;
-  --ink-dim: #9498ab;
-  --ink-faint: #5b5f70;
+  /* Wood end cheeks. */
+  --wood-base: #6e4526;
+  --wood-lo: #4d2d15;
+  --wood-hi: #9a6a3e;
+  --cheek-w: 34px;
 
-  --accent-diatonic: #52e6c1;
-  --accent-diatonic-bg: rgba(82, 230, 193, 0.12);
-  --accent-borrowed: #ff9d5c;
-  --accent-borrowed-bg: rgba(255, 157, 92, 0.14);
-  --accent-surprise: #9497ff;
-  --accent-surprise-bg: rgba(148, 151, 255, 0.14);
-  --accent-danger: #ff6b6b;
+  --ink: #e9e7dc;
+  --ink-dim: #9c9c91;
+  --ink-faint: #65665e;
 
-  /* Melody lane row tints: chord tone, other scale tone, off-scale. Kept
-     dark enough that the note blocks and the chord accents stay dominant. */
-  --lane-chord: rgba(82, 230, 193, 0.16);
-  --lane-scale: rgba(148, 151, 255, 0.07);
-  --lane-off: #101219;
+  /* The four lamps. Nothing else in the UI is allowed a hue. */
+  --lamp-key: #6fd39a;
+  --lamp-borrowed: #e8a33d;
+  --lamp-outside: #ab8bff;
+  --lamp-on: #f4efdf;
+  --lamp-danger: #e0574f;
+
+  /* Melody lane row tints: chord tone, other scale tone, off-scale. Set from
+     MelodyLane.tsx, which is why these three keep their names. */
+  --lane-chord: rgba(111, 211, 154, 0.15);
+  --lane-scale: rgba(233, 231, 220, 0.055);
+  --lane-off: #0c0d0e;
 
   /* The melody lane's note-name gutter. The progression grid indents by the
      same amount so a chord tile sits exactly over the melody steps it sounds
      against — both are drawn at the same pixels-per-beat. */
   --lane-gutter-w: 46px;
 
-  --focus-ring: #9497ff;
-  --radius: 6px;
-  --radius-lg: 10px;
+  --focus-ring: var(--lamp-on);
+  --radius: 4px;
+  --radius-lg: 6px;
 
   /* Real height of the fixed transport bar, kept current by a ResizeObserver
      in Transport.tsx. The fallback matches its old fixed single-row height,
      for the first paint before the observer's first callback lands. */
   --transport-h: 96px;
+
+  /* A single panel screw, reused at four corners via background-position. */
+  --screw: radial-gradient(
+    circle at 50% 38%,
+    #a4a79a 0 2.2px,
+    #8b8e81 2.2px 4.2px,
+    #4a4c43 4.2px 5.2px,
+    #0d0e0d 5.2px 6.1px,
+    transparent 6.1px
+  );
+
+  /* Brushed aluminium. A repeating gradient cannot do this — any fixed period
+     reads as a pinstripe, which is exactly what brushed metal isn't. What
+     makes a brushed surface look brushed is *anisotropic noise*: irregular
+     scratches, dense across the grain and stretched along it. So this is
+     fractal turbulence with its x frequency near zero and its y frequency
+     high, which smears the noise into long horizontal streaks of random
+     width and spacing. Painted at 100% width (see --grain-size) so it never
+     tiles horizontally and no repeat seam is visible.
+
+     Note for editors: `#` must stay percent-encoded as %23 inside a data URI,
+     and the whole value has to stay on quoted single lines — a stray newline
+     inside the url() silently kills it. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='240'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004 0.9' numOctaves='3' seed='11'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='1600' height='240' filter='url(%23b)' opacity='0.22'/%3E%3C/svg%3E");
+  --grain-size: 100% 240px;
+
+  /* The same trick at a fraction of the strength, for the recessed wells.
+     A well is a milled pocket, not a brushed face — it wants enough tooth to
+     read as a surface and no more. */
+  --grain-well: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='240'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006 0.8' numOctaves='2' seed='5'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='1600' height='240' filter='url(%23w)' opacity='0.07'/%3E%3C/svg%3E");
+
+  /* The specular sweep across a metal face: bright where the light is,
+     falling off to either side. Does as much of the work as the grain. */
+  --sheen: linear-gradient(
+    100deg,
+    rgba(0, 0, 0, 0.12) 0%,
+    rgba(255, 255, 255, 0.045) 34%,
+    rgba(255, 255, 255, 0.015) 52%,
+    rgba(0, 0, 0, 0.16) 100%
+  );
 
   color-scheme: dark;
 }
@@ -61,21 +119,77 @@
 }
 
 .tp-app {
+  position: relative;
   min-height: 100svh;
-  background: var(--bg-0);
+  background: var(--void);
   color: var(--ink);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  /* Bottom padding tracks the fixed transport's real height (see
-     --transport-h) plus a small gap, so the last row of content is never
-     hidden under it — true whether the bar is one row on desktop or a
-     collapsed/expanded stack on a phone. */
-  padding: 20px clamp(14px, 3vw, 40px) calc(var(--transport-h) + 16px);
+  gap: 12px;
+  /* Side padding clears the wood cheeks; bottom padding tracks the fixed
+     transport's real height (see --transport-h) plus a small gap, so the last
+     row of content is never hidden under it. */
+  padding: 18px calc(var(--cheek-w) + clamp(10px, 2vw, 24px)) calc(var(--transport-h) + 16px);
 }
 
-/* focus ring, applied consistently to every interactive control */
+/* The machine's wooden sides. Fixed rather than absolute so they run the full
+   height of the window whatever the page is doing, and above the transport
+   (z-index 10) so the bar reads as sitting *between* them rather than
+   crossing them. Below the slot popover (40) and the loading overlay (50). */
+.tp-app::before,
+.tp-app::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: var(--cheek-w);
+  z-index: 30;
+  pointer-events: none;
+  background-color: var(--wood-base);
+  background-image:
+    repeating-linear-gradient(90.4deg, rgba(0, 0, 0, 0.4) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(89.6deg, rgba(255, 255, 255, 0.085) 0 1px, transparent 1px 6px),
+    repeating-linear-gradient(
+      90deg,
+      var(--wood-hi) 0 4px,
+      var(--wood-base) 4px 11px,
+      var(--wood-lo) 11px 14px,
+      var(--wood-base) 14px 20px,
+      var(--wood-hi) 20px 23px,
+      var(--wood-base) 23px 28px,
+      var(--wood-lo) 28px 34px
+    );
+}
+
+.tp-app::before {
+  left: 0;
+  box-shadow:
+    inset -6px 0 10px rgba(0, 0, 0, 0.55),
+    inset 2px 0 0 rgba(255, 255, 255, 0.09),
+    4px 0 12px rgba(0, 0, 0, 0.6);
+}
+
+.tp-app::after {
+  right: 0;
+  box-shadow:
+    inset 6px 0 10px rgba(0, 0, 0, 0.55),
+    inset -2px 0 0 rgba(255, 255, 255, 0.09),
+    -4px 0 12px rgba(0, 0, 0, 0.6);
+}
+
+/* Everything lives on one chassis width so the panels stack as a single
+   column of gear rather than drifting apart on a wide monitor. */
+.tp-app > header,
+.tp-app > main,
+.tp-transport__inner {
+  width: 100%;
+  max-width: 1240px;
+  margin-inline: auto;
+}
+
+/* focus ring, applied consistently to every interactive control. Warm white,
+   not a hue — a hue here would read as harmonic information. */
 .tp-app :is(button, select, input, a):focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
@@ -89,95 +203,313 @@
 }
 
 /* ---------------------------------------------------------------------- */
-/* Header + key picker                                                    */
+/* Panel: the shape every section takes                                    */
+/* ---------------------------------------------------------------------- */
+/* A faceplate (raised, brushed, screwed down at four corners) carrying a
+   label rail across the top and a recessed well below it. Applied to the
+   strips, the progression grid and the melody section alike, so the page is
+   a stack of identical modules rather than ten loose groups of controls. */
+
+.tp-strip,
+.tp-grid {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--panel-top), var(--panel-bot));
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    inset 0 1px 0 var(--edge),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.7),
+    0 2px 4px rgba(0, 0, 0, 0.55);
+}
+
+/* Brushed grain, then the specular sweep over it. */
+.tp-strip::before,
+.tp-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+  background-image: var(--sheen), var(--grain);
+  background-size:
+    auto,
+    var(--grain-size);
+  background-repeat: no-repeat, repeat-y;
+}
+
+/* Four corner screws. */
+.tp-strip::after,
+.tp-grid::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: 13px 13px;
+  background-position:
+    7px 7px,
+    calc(100% - 7px) 7px,
+    7px calc(100% - 7px),
+    calc(100% - 7px) calc(100% - 7px);
+  background-image: var(--screw), var(--screw), var(--screw), var(--screw);
+}
+
+/* The label rail. Legend and its caption at the left, controls at the right —
+   the reverse of where they used to sit. A hint belongs beside the thing it
+   describes, not floated to the far edge of the screen away from it. */
+.tp-strip__header,
+.tp-grid__header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+  padding: 9px 24px 8px;
+  border-bottom: 1px solid #000;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.tp-panel__legend {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.tp-rail__end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Silkscreened panel legend: condensed, uppercase, tracked out, and cut into
+   the faceplate with a one-pixel drop shadow. */
+.tp-strip__eyebrow {
+  font-family: var(--font-legend);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.17em;
+  color: #c3c2b6;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.95);
+  white-space: nowrap;
+}
+
+.tp-strip__hint {
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--ink-faint);
+}
+
+/* One instruction per input method, because they are not the same gesture: a
+   mouse drag starts on the first pixel of movement, a touch drag only after a
+   press is held (see the TouchSensor delay in TheoryPal), and a phone user who
+   is told plain "drag" will swipe, scroll the page, and conclude the chord
+   cannot be moved. */
+.tp-hint--coarse {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .tp-hint--fine {
+    display: none;
+  }
+
+  .tp-hint--coarse {
+    display: inline;
+  }
+}
+
+/* The recessed well every panel's content sits in. Content narrower than the
+   well leaves bare well showing, which reads as unlit panel space — the
+   reason the grid no longer looks like it is floating in an empty page. */
+.tp-strip__cells,
+.tp-grid__scroll,
+.tp-lane {
+  position: relative;
+  z-index: 1;
+  margin: 10px 22px;
+  padding: 11px 12px;
+  background: var(--well);
+  border-radius: 3px;
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.85),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.9),
+    0 1px 0 var(--edge);
+  /* Just enough tooth that empty stretches of well read as a milled surface
+     rather than as a hole in the page. */
+  background-image: var(--grain-well);
+  background-size: var(--grain-size);
+  background-repeat: repeat-y;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Header + key picker                                                     */
 /* ---------------------------------------------------------------------- */
 
 .tp-header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px 28px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--line);
+  gap: 12px 20px;
+  padding: 2px 4px 10px;
 }
 
 .tp-header__brand {
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
   margin: 0;
+  font-family: var(--font-legend);
+  font-size: 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: #dcd9cb;
+  text-shadow: 0 1px 0 #000;
   white-space: nowrap;
 }
 
+/* The one lit thing in the wordmark: the machine's power lamp. */
 .tp-header__brand-mark {
-  color: var(--accent-surprise);
+  color: var(--lamp-key);
+  text-shadow: 0 0 9px rgba(111, 211, 154, 0.8);
 }
 
 .tp-key-picker {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   flex-wrap: wrap;
 }
 
-.tp-key-picker__label {
-  font-size: 11px;
+.tp-key-picker__label,
+.tp-mixer__label {
+  font-family: var(--font-legend);
+  font-size: 10px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--ink-faint);
+  letter-spacing: 0.16em;
+  color: #7f8078;
+  text-shadow: 0 1px 0 #000;
 }
 
-.tp-tonics {
+/* ---------------------------------------------------------------------- */
+/* Switch banks: the shared vocabulary for every set of toggles            */
+/* ---------------------------------------------------------------------- */
+/* Tonics, chord modifiers, bar counts, snap divisions, melody resolution,
+   zoom, draw/erase — all the same object: keys sunk into a milled recess,
+   the engaged one pressed in and lit. */
+
+.tp-tonics,
+.tp-size-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  background: var(--bg-1);
-  padding: 4px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--line);
-  /* 12 buttons don't fit one row under ~380px of available width; wrapping
-     to two rows keeps every tonic reachable without a horizontal scroller
-     or shrinking hit targets below the touch minimum. */
+  gap: 2px;
+  padding: 3px;
+  background: #0b0c0a;
+  border-radius: var(--radius);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.85),
+    0 1px 0 var(--edge);
+  /* 12 tonic buttons don't fit one row under ~380px of available width;
+     wrapping keeps every tonic reachable without a horizontal scroller or
+     hit targets below the touch minimum. */
   max-width: 100%;
 }
 
-.tp-tonic-btn {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink-dim);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius);
-  padding: 6px 9px;
+.tp-tonic-btn,
+.tp-size-btn {
+  all: unset;
+  box-sizing: border-box;
   cursor: pointer;
-  transition:
-    background 0.12s ease,
-    color 0.12s ease;
-}
-
-.tp-tonic-btn:hover {
-  color: var(--ink);
-  background: var(--bg-2);
-}
-
-.tp-tonic-btn[aria-pressed='true'] {
-  background: var(--accent-surprise);
-  color: #10111a;
-}
-
-.tp-scale-select {
-  font-family: var(--font-display);
-  font-size: 14px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
   font-weight: 500;
+  color: var(--ink-dim);
+  padding: 6px 10px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #3d3f38, #2c2e28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 1px 0 #0a0b0a;
+  transition:
+    color 0.1s ease,
+    background 0.1s ease;
+}
+
+.tp-tonic-btn:hover,
+.tp-size-btn:hover {
   color: var(--ink);
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 8px 10px;
+  background: linear-gradient(180deg, #4a4c44, #35372f);
+}
+
+/* Engaged: the key is pressed into the panel and backlit. */
+.tp-tonic-btn[aria-pressed='true'],
+.tp-size-btn[aria-pressed='true'] {
+  color: var(--lamp-on);
+  background: linear-gradient(180deg, #17181a, #232520);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 0 8px rgba(244, 239, 223, 0.35);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Readouts: selects and numeric fields                                    */
+/* ---------------------------------------------------------------------- */
+/* Native <select> kept for its keyboard handling, optgroup support and the
+   OS picker on a phone; only its chrome is replaced, so what you see is a
+   recessed panel readout with a machined chevron instead of an OS widget. */
+
+.tp-scale-select,
+.tp-midi-picker__select {
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background-color: #0a0b0a;
+  /* The chevron, drawn rather than inherited from the OS. */
+  background-image: linear-gradient(45deg, transparent 50%, #7d7e75 50%),
+    linear-gradient(135deg, #7d7e75 50%, transparent 50%);
+  background-position:
+    right 15px top 52%,
+    right 10px top 52%;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  border: none;
+  border-radius: 3px;
+  padding: 7px 30px 7px 10px;
   cursor: pointer;
   max-width: 260px;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.85),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.9),
+    0 1px 0 var(--edge);
 }
+
+.tp-scale-select:disabled,
+.tp-midi-picker__select:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* The dropdown list itself is drawn by the OS; at least keep it dark. */
+.tp-scale-select option,
+.tp-midi-picker__select option {
+  background: #16171a;
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Model badge                                                             */
+/* ---------------------------------------------------------------------- */
 
 .tp-model-badge {
   margin-left: auto;
@@ -185,12 +517,15 @@
   align-items: center;
   gap: 7px;
   font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.03em;
-  color: var(--ink-faint);
-  padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: var(--ink-dim);
+  padding: 6px 11px;
+  border-radius: 3px;
+  background: #0b0c0a;
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.8),
+    0 1px 0 var(--edge);
   white-space: nowrap;
 }
 
@@ -203,21 +538,14 @@
 }
 
 .tp-model-badge--loading .tp-model-badge__dot {
-  background: var(--accent-surprise);
+  background: var(--lamp-on);
+  box-shadow: 0 0 7px rgba(244, 239, 223, 0.8);
   animation: tp-pulse 1.1s ease-in-out infinite;
 }
 
 .tp-model-badge--corpus .tp-model-badge__dot {
-  background: var(--accent-diatonic);
-}
-
-.tp-model-badge--corpus {
-  color: var(--accent-diatonic);
-  border-color: color-mix(in srgb, var(--accent-diatonic) 40%, var(--line));
-}
-
-.tp-model-badge--prior {
-  color: var(--ink-dim);
+  background: var(--lamp-key);
+  box-shadow: 0 0 7px rgba(111, 211, 154, 0.9);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -232,7 +560,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: color-mix(in srgb, var(--bg-0) 78%, transparent);
+  background: color-mix(in srgb, var(--void) 80%, transparent);
   backdrop-filter: blur(3px);
 }
 
@@ -244,21 +572,25 @@
   max-width: 340px;
   text-align: center;
   padding: 26px 28px;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--panel-top), var(--panel-bot));
+  border: 1px solid var(--panel-line);
   border-radius: var(--radius-lg);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+  box-shadow:
+    inset 0 1px 0 var(--edge),
+    0 18px 48px rgba(0, 0, 0, 0.6);
 }
 
 .tp-overlay__title {
-  font-family: var(--font-mono);
+  font-family: var(--font-legend);
   font-size: 13px;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
   color: var(--ink);
 }
 
 .tp-overlay__title--error {
-  color: var(--accent-danger);
+  color: var(--lamp-danger);
 }
 
 .tp-overlay__note {
@@ -272,8 +604,8 @@
   width: 26px;
   height: 26px;
   border-radius: 999px;
-  border: 2px solid var(--line);
-  border-top-color: var(--accent-surprise);
+  border: 2px solid rgba(0, 0, 0, 0.6);
+  border-top-color: var(--lamp-on);
   animation: tp-spin 0.8s linear infinite;
 }
 
@@ -300,59 +632,13 @@
 }
 
 /* ---------------------------------------------------------------------- */
-/* Strips (diatonic + suggestions) — shared layout                        */
+/* Strips (diatonic + suggestions)                                         */
 /* ---------------------------------------------------------------------- */
-
-.tp-strip {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-
-.tp-strip__header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 10px;
-}
-
-.tp-strip__eyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--ink-faint);
-}
-
-.tp-strip__hint {
-  font-size: 12px;
-  color: var(--ink-faint);
-}
-
-/* One instruction per input method, because they are not the same gesture: a
-   mouse drag starts on the first pixel of movement, a touch drag only after a
-   press is held (see the TouchSensor delay in TheoryPal), and a phone user who
-   is told plain "drag" will swipe, scroll the page, and conclude the chord
-   cannot be moved. */
-.tp-hint--coarse {
-  display: none;
-}
-
-@media (pointer: coarse) {
-  .tp-hint--fine {
-    display: none;
-  }
-
-  .tp-hint--coarse {
-    display: inline;
-  }
-}
 
 .tp-strip__cells {
   display: flex;
-  gap: 8px;
+  gap: 9px;
   overflow-x: auto;
-  padding: 0 2px 4px;
   scrollbar-width: none;
   align-items: flex-start;
   /* A carousel, not a plain overflow box: cells settle on their own edge
@@ -362,31 +648,16 @@
      coast past a snap point instead of being yanked back. */
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
-  /* The strip is already inset by the page's own side padding; this fade
-     is the "more cells exist" cue at each end, on top of the partial cell
-     that's already visible past the fold. */
-  mask-image: linear-gradient(to right, transparent, black 10px, black calc(100% - 10px), transparent);
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent,
-    black 10px,
-    black calc(100% - 10px),
-    transparent
-  );
 }
 
-/* Fine pointers (mouse/trackpad) get the old visible thin scrollbar back —
-   it's useful affordance there and costs no space, since hover/scrollbar
-   chrome doesn't compete with a finger. */
+/* Fine pointers (mouse/trackpad) get a visible thin scrollbar — it's useful
+   affordance there and costs no space, since scrollbar chrome doesn't compete
+   with a finger. */
 @media (hover: hover) and (pointer: fine) {
   .tp-strip__cells {
     scrollbar-width: thin;
   }
 }
-
-/* ---------------------------------------------------------------------- */
-/* Chord face — the visual centerpiece                                    */
-/* ---------------------------------------------------------------------- */
 
 .strip-cell {
   all: unset;
@@ -408,62 +679,113 @@
   opacity: 0.35;
 }
 
+/* ---------------------------------------------------------------------- */
+/* Chord face — the keycap, and the centrepiece of the whole design        */
+/* ---------------------------------------------------------------------- */
+
 .chord-face {
   position: relative;
-  width: 104px;
-  min-height: 84px;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-top: 2px solid var(--line);
-  border-radius: var(--radius);
-  padding: 10px 10px 8px;
+  width: 112px;
+  min-height: 94px;
+  padding: 14px 11px 9px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: flex-start;
-  gap: 2px;
+  gap: 3px;
+  border: 1px solid #0b0c0a;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #454840 0%, #34362f 45%, #2b2d27 100%);
+  box-shadow:
+    0 2px 0 #101210,
+    0 5px 9px rgba(0, 0, 0, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.4);
   transition:
-    transform 0.08s ease,
-    background 0.12s ease,
-    border-color 0.12s ease;
+    transform 0.07s ease,
+    background 0.12s ease;
 }
 
 .strip-cell:hover .chord-face,
 .grid-slot__body:hover .chord-face {
-  background: var(--bg-3);
+  background: linear-gradient(180deg, #4f5249, #3a3c34 45%, #303229 100%);
 }
 
+/* Pressed: the cap travels down and its drop edge disappears under it. */
 .strip-cell:active .chord-face {
-  transform: scale(0.97);
+  transform: translateY(2px);
+  box-shadow:
+    0 0 0 #101210,
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* The lamp window: a slot milled into the cap's top edge with a bulb behind
+   it. This is the app's core "spot the borrowed chord instantly" signal, and
+   the reason it glows rather than being a flat border — a glow is the one
+   thing a rectangle of color can't imitate. */
+.chord-face::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 11px;
+  right: 11px;
+  height: 3px;
+  border-radius: 2px;
+  background: #0a0b0a;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.chord-face::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 11px;
+  right: 11px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--lamp);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--lamp) 70%, transparent);
 }
 
 .chord-face--diatonic {
-  border-top-color: var(--accent-diatonic);
+  --lamp: var(--lamp-key);
 }
 
 .chord-face--borrowed {
-  border-top-color: var(--accent-borrowed);
+  --lamp: var(--lamp-borrowed);
 }
 
 .chord-face--surprise {
-  border-top-color: var(--accent-surprise);
-  border-style: dashed;
-  background: var(--accent-surprise-bg);
+  --lamp: var(--lamp-outside);
+  /* Faintly lit from within, so the surprise cell reads as a different kind
+     of offer than the ranked ones next to it. */
+  background: linear-gradient(180deg, #4a4553 0%, #383243 45%, #2e2937 100%);
 }
 
+/* An empty slot is an unlit socket, not a card: recessed, no cap, no lamp. */
 .chord-face--empty {
   align-items: center;
   justify-content: center;
-  border-style: dashed;
-  background: transparent;
+  background: #0d0e10;
+  border: 1px solid #000;
+  box-shadow:
+    inset 0 3px 7px rgba(0, 0, 0, 0.85),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.9);
+}
+
+.chord-face--empty::before,
+.chord-face--empty::after {
+  display: none;
 }
 
 .chord-face__roman {
   font-family: var(--font-mono);
-  font-size: 19px;
+  font-size: 21px;
   font-weight: 600;
-  line-height: 1.1;
-  color: var(--ink);
+  line-height: 1.05;
+  color: #f0eee3;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.85);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -472,67 +794,77 @@
 
 .chord-face__name {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
   color: var(--ink-dim);
 }
 
 .chord-face__placeholder {
-  font-size: 20px;
-  color: var(--ink-faint);
+  font-size: 19px;
+  color: #3d3e39;
 }
 
+/* Probability as a segmented LED meter. Unlit segments stay faintly visible
+   in the lamp's own hue, the way an idle VU strip does, so the meter reads as
+   a scale rather than as a bar that starts nowhere. */
 .chord-face__prob {
   width: 100%;
-  margin-top: 6px;
+  margin-top: auto;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .chord-face__prob-bar-track {
+  display: block;
+  position: relative;
   width: 100%;
-  height: 3px;
-  border-radius: 999px;
-  background: var(--line);
+  height: 7px;
+  border-radius: 1px;
   overflow: hidden;
+  background: color-mix(in srgb, var(--lamp) 20%, #000);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.8),
+    0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .chord-face__prob-bar {
+  display: block;
   height: 100%;
-  border-radius: 999px;
-  background: var(--ink-faint);
+  background: var(--lamp);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--lamp) 75%, transparent);
 }
 
-.chord-face--diatonic .chord-face__prob-bar {
-  background: var(--accent-diatonic);
-}
-
-.chord-face--borrowed .chord-face__prob-bar {
-  background: var(--accent-borrowed);
-}
-
-.chord-face--surprise .chord-face__prob-bar {
-  background: var(--accent-surprise);
+/* The segment gaps, cut across lit and unlit alike. */
+.chord-face__prob-bar-track::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 5px, #0b0c0d 5px 7px);
 }
 
 .chord-face__prob-text {
   font-family: var(--font-mono);
   font-size: 10.5px;
-  color: var(--ink-faint);
+  color: #9a9b90;
 }
 
+/* Whether this suggestion came from the corpus or the theory prior: a pin-head
+   lamp in the cap's top-right corner. */
 .chord-face__corpus-mark {
   position: absolute;
-  top: 6px;
-  right: 7px;
+  top: 12px;
+  right: 9px;
   width: 5px;
   height: 5px;
   border-radius: 999px;
-  background: var(--ink-faint);
+  background: #16171a;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.9);
 }
 
 .chord-face__corpus-mark[data-corpus='true'] {
-  background: var(--accent-diatonic);
+  background: var(--lamp-key);
+  box-shadow: 0 0 6px rgba(111, 211, 154, 0.85);
 }
 
 .tp-surprise-cell {
@@ -559,40 +891,46 @@
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
-  color: var(--accent-surprise);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  transition:
-    background 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease;
+  color: var(--ink-dim);
+  border: 1px solid #0a0b0a;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #3d3f38, #2c2e28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 1px 0 #0a0b0a;
 }
 
 .tp-reroll-btn:hover {
-  background: var(--bg-3);
-  border-color: var(--accent-surprise);
   color: var(--ink);
+  background: linear-gradient(180deg, #4a4c44, #35372f);
+}
+
+.tp-reroll-btn:active {
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7);
 }
 
 .tp-surprise-label {
   position: absolute;
-  bottom: 6px;
-  right: 8px;
+  bottom: 7px;
+  right: 9px;
+  font-family: var(--font-legend);
   font-size: 9px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--accent-surprise);
+  letter-spacing: 0.12em;
+  color: var(--lamp-outside);
+  text-shadow: 0 0 8px rgba(171, 139, 255, 0.5);
 }
 
 /* ---------------------------------------------------------------------- */
-/* Melody lane                                                            */
+/* Melody lane                                                             */
 /* ---------------------------------------------------------------------- */
 
 .tp-lane {
   display: flex;
   align-items: flex-start;
   gap: 0;
+  overflow: hidden;
 }
 
 /* Note-name gutter. Stays put while the lane scrolls horizontally, and its
@@ -601,10 +939,9 @@
   display: flex;
   flex-direction: column;
   flex: none;
-  border: 1px solid var(--line);
-  border-right: none;
-  border-radius: var(--radius) 0 0 var(--radius);
-  background: var(--bg-1);
+  border-radius: 2px 0 0 2px;
+  background: #131416;
+  box-shadow: inset -1px 0 0 #000;
   overflow: hidden;
 }
 
@@ -621,7 +958,7 @@
   font-size: 9px;
   line-height: 1;
   color: var(--ink-faint);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.35);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.45);
   transition:
     color 0.1s ease,
     background 0.1s ease;
@@ -629,25 +966,22 @@
 
 .tp-lane__key:hover {
   color: var(--ink);
-  background: var(--bg-3);
+  background: #23252a;
 }
 
 .tp-lane__key--tonic {
   color: var(--ink-dim);
-  border-bottom-color: var(--line);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
 .tp-lane__scroll {
   overflow-x: auto;
-  padding-bottom: 4px;
   scrollbar-width: thin;
 }
 
 .tp-lane__surface {
   position: relative;
-  border: 1px solid var(--line);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  background: var(--bg-1);
+  background: var(--lane-off);
   overflow: hidden;
   cursor: crosshair;
   touch-action: none;
@@ -657,40 +991,40 @@
   position: absolute;
   left: 0;
   right: 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.35);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.45);
   pointer-events: none;
 }
 
 /* Octave markers: the tonic row reads as the lane's ruler. */
 .tp-lane__row--tonic {
-  border-bottom-color: var(--line);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
   box-shadow: inset 0 0 0 9999px rgba(255, 255, 255, 0.02);
 }
 
 /* Hovering a bar resolves the whole lane to that one chord, in three tiers:
-   its own tones in the chord accent, the key's other scale tones in grey
+   its own tones in the chord lamp, the key's other scale tones in grey
    behind them, everything off-scale pushed back. Applied as an overlay so the
    per-bar tinting underneath stays visible rather than being replaced. */
 .tp-lane__row--lit {
-  box-shadow: inset 0 0 0 9999px rgba(82, 230, 193, 0.18);
+  box-shadow: inset 0 0 0 9999px rgba(111, 211, 154, 0.17);
 }
 
 .tp-lane__row--scale {
-  box-shadow: inset 0 0 0 9999px rgba(180, 186, 205, 0.09);
+  box-shadow: inset 0 0 0 9999px rgba(233, 231, 220, 0.075);
 }
 
 .tp-lane__row--dim {
-  box-shadow: inset 0 0 0 9999px rgba(10, 11, 15, 0.6);
+  box-shadow: inset 0 0 0 9999px rgba(8, 9, 10, 0.62);
 }
 
 .tp-lane__key--lit {
-  color: var(--accent-diatonic);
-  background: rgba(82, 230, 193, 0.1);
+  color: var(--lamp-key);
+  background: rgba(111, 211, 154, 0.1);
 }
 
 .tp-lane__key--scale {
   color: var(--ink-dim);
-  background: rgba(180, 186, 205, 0.06);
+  background: rgba(233, 231, 220, 0.05);
 }
 
 .tp-lane__key--dim {
@@ -704,17 +1038,17 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  border-left: 1px solid var(--line);
+  border-left: 1px solid rgba(255, 255, 255, 0.11);
   pointer-events: none;
 }
 
 .tp-lane__segment--playing {
-  background: rgba(148, 151, 255, 0.08);
+  background: rgba(244, 239, 223, 0.07);
 }
 
 .tp-lane__segment--hovered {
-  border-left-color: var(--accent-diatonic);
-  box-shadow: inset -1px 0 0 var(--accent-diatonic);
+  border-left-color: var(--lamp-key);
+  box-shadow: inset -1px 0 0 var(--lamp-key);
 }
 
 /* The bars themselves, behind the chord spans and dimmer than them. */
@@ -723,22 +1057,29 @@
   top: 0;
   bottom: 0;
   width: 0;
-  border-left: 1px dashed var(--bg-3);
+  border-left: 1px dashed rgba(255, 255, 255, 0.055);
   pointer-events: none;
 }
 
+/* A written note is a lit bar — the same lamp as an in-key chord, because
+   that is what it usually is. */
 .tp-lane__note {
   position: absolute;
-  border-radius: 3px;
-  background: var(--accent-diatonic);
-  border: 1px solid rgba(0, 0, 0, 0.4);
+  border-radius: 2px;
+  background: var(--lamp-key);
+  border: 1px solid rgba(0, 0, 0, 0.55);
   /* The right edge is the resize grip — hinted with a darker cap. */
-  box-shadow: inset -3px 0 0 rgba(0, 0, 0, 0.25);
+  box-shadow:
+    inset -3px 0 0 rgba(0, 0, 0, 0.3),
+    0 0 7px rgba(111, 211, 154, 0.45);
   cursor: grab;
 }
 
 .tp-lane__note--active {
-  background: var(--accent-surprise);
+  background: var(--lamp-on);
+  box-shadow:
+    inset -3px 0 0 rgba(0, 0, 0, 0.3),
+    0 0 9px rgba(244, 239, 223, 0.6);
   cursor: grabbing;
 }
 
@@ -749,24 +1090,23 @@
 
 .tp-lane__erase-box {
   position: absolute;
-  border: 1px solid var(--accent-danger);
-  background: rgba(255, 107, 107, 0.16);
+  border: 1px solid var(--lamp-danger);
+  background: rgba(224, 87, 79, 0.16);
   pointer-events: none;
 }
 
+/* The surprise fader, and any other inline labelled slider. */
 .tp-lane__slider {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-family: var(--font-legend);
+  font-size: 10px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--ink-faint);
-}
-
-.tp-lane__slider input[type='range'] {
-  width: 110px;
-  accent-color: var(--accent-surprise);
+  letter-spacing: 0.16em;
+  color: #7f8078;
+  text-shadow: 0 1px 0 #000;
 }
 
 .tp-lane__slider-value {
@@ -774,52 +1114,71 @@
   font-size: 11px;
   color: var(--ink-dim);
   min-width: 34px;
+  letter-spacing: 0;
 }
 
 /* ---------------------------------------------------------------------- */
-/* Progression grid                                                       */
+/* Faders                                                                  */
 /* ---------------------------------------------------------------------- */
+/* One fader design for the mixer and the surprise knob: a groove milled into
+   the panel with a metal cap riding in it. */
 
-.tp-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-
-.tp-grid__header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.tp-size-group {
-  display: flex;
-  gap: 4px;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 3px;
-}
-
-.tp-size-btn {
-  all: unset;
+.tp-lane__slider input[type='range'],
+.tp-transport__mixer input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 96px;
+  height: 18px;
+  background: transparent;
   cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink-dim);
-  padding: 5px 10px;
-  border-radius: 4px;
 }
 
-.tp-size-btn:hover {
-  color: var(--ink);
+.tp-lane__slider input[type='range']::-webkit-slider-runnable-track,
+.tp-transport__mixer input[type='range']::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 2px;
+  background: #0a0b0a;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 
-.tp-size-btn[aria-pressed='true'] {
-  background: var(--bg-3);
-  color: var(--ink);
+.tp-lane__slider input[type='range']::-webkit-slider-thumb,
+.tp-transport__mixer input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 18px;
+  border-radius: 2px;
+  margin-top: -6.5px;
+  background: linear-gradient(180deg, #5a5d53, #2e302a);
+  border: 1px solid #000;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 1px 2px rgba(0, 0, 0, 0.6);
 }
+
+.tp-lane__slider input[type='range']::-moz-range-track,
+.tp-transport__mixer input[type='range']::-moz-range-track {
+  height: 5px;
+  border-radius: 2px;
+  background: #0a0b0a;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.tp-lane__slider input[type='range']::-moz-range-thumb,
+.tp-transport__mixer input[type='range']::-moz-range-thumb {
+  width: 12px;
+  height: 18px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #5a5d53, #2e302a);
+  border: 1px solid #000;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Progression grid                                                        */
+/* ---------------------------------------------------------------------- */
 
 /* The grid is a timeline: a tile is as wide as its chord is long, at the same
    pixels-per-beat the melody lane below uses, so the two read as one ruler.
@@ -827,7 +1186,6 @@
 .tp-grid__scroll {
   overflow-x: auto;
   overflow-y: visible;
-  padding-bottom: 4px;
 }
 
 .tp-grid__track {
@@ -837,7 +1195,8 @@
 
 .tp-grid__ruler {
   position: relative;
-  height: 13px;
+  height: 14px;
+  margin-bottom: 4px;
 }
 
 .tp-grid__bar-number {
@@ -845,10 +1204,10 @@
   top: 0;
   font-family: var(--font-mono);
   font-size: 9px;
-  line-height: 13px;
-  color: var(--ink-faint);
-  padding-left: 4px;
-  border-left: 1px solid var(--line);
+  line-height: 14px;
+  color: #4e4f48;
+  padding-left: 5px;
+  border-left: 1px solid rgba(255, 255, 255, 0.09);
   box-sizing: border-box;
   pointer-events: none;
 }
@@ -860,8 +1219,8 @@
   display: flex;
   align-items: flex-start;
   background-image:
-    repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px var(--bar-w)),
-    repeating-linear-gradient(to right, var(--bg-3) 0 1px, transparent 1px var(--beat-w));
+    repeating-linear-gradient(to right, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px var(--bar-w)),
+    repeating-linear-gradient(to right, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px var(--beat-w));
   background-position: 0 0;
 }
 
@@ -892,19 +1251,24 @@
 
 .grid-slot__body .chord-face {
   width: 100%;
-  min-height: 72px;
+  min-height: 84px;
 }
 
+/* Sounding now: the cap is backlit warm white. Not a hue, because "playing"
+   is not a harmonic property and must not compete with the lamp above it. */
 .grid-slot--playing .chord-face {
-  border-color: var(--accent-surprise);
-  box-shadow: 0 0 0 1px var(--accent-surprise);
+  border-color: rgba(244, 239, 223, 0.55);
+  box-shadow:
+    0 2px 0 #101210,
+    0 0 18px rgba(244, 239, 223, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .grid-slot__clear {
   all: unset;
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 5px;
+  right: 5px;
   cursor: pointer;
   width: 16px;
   height: 16px;
@@ -916,8 +1280,8 @@
 }
 
 .grid-slot__clear:hover {
-  color: var(--accent-danger);
-  background: var(--bg-3);
+  color: var(--lamp-danger);
+  background: rgba(0, 0, 0, 0.5);
 }
 
 /* The chord editor's handle: a small "edit" button under each filled slot,
@@ -931,36 +1295,43 @@
   cursor: pointer;
   display: block;
   width: 100%;
+  box-sizing: border-box;
   text-align: center;
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.06em;
   color: var(--ink-faint);
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 3px 0;
+  border-radius: 3px;
+  padding: 4px 0;
+  background: linear-gradient(180deg, #34362f, #26281f);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 1px 0 #0a0b0a;
 }
 
 .grid-slot__edit-btn:hover,
 .grid-slot__edit-btn[aria-expanded='true'] {
   color: var(--ink);
-  background: var(--bg-3);
+  background: linear-gradient(180deg, #44463d, #2f3129);
 }
 
 /* An empty slot the user has clicked, and the one the suggestion strip is
-   ranking for. Selection is quiet (a dashed border going solid); the targeted
-   slot is loud, because the strip above it has changed what it means and the
-   only thing tying the two together is that they light up as a pair. */
-.grid-slot--selected .grid-slot__body {
-  border-style: solid;
-  border-color: var(--ink-faint);
+   ranking for. Selection is quiet (the socket's rim picks up a highlight);
+   the targeted slot is loud, because the strip above it has changed what it
+   means and the only thing tying the two together is that they light as a
+   pair. */
+.grid-slot--selected .chord-face {
+  box-shadow:
+    inset 0 3px 7px rgba(0, 0, 0, 0.85),
+    inset 0 0 0 1px rgba(233, 231, 220, 0.28);
 }
 
-.grid-slot--targeted .grid-slot__body {
-  border-style: solid;
-  border-color: var(--accent-diatonic);
-  background: color-mix(in srgb, var(--accent-diatonic) 12%, transparent);
+.grid-slot--targeted .chord-face {
+  background: #121a15;
+  box-shadow:
+    inset 0 3px 7px rgba(0, 0, 0, 0.8),
+    inset 0 0 0 1px var(--lamp-key),
+    inset 0 0 18px rgba(111, 211, 154, 0.2);
 }
 
 .grid-slot__suggest-btn {
@@ -973,11 +1344,11 @@
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.04em;
-  color: var(--ink);
-  background: var(--bg-3);
-  border: 1px solid var(--accent-diatonic);
-  border-radius: 4px;
-  padding: 3px 4px;
+  color: #0a1310;
+  background: var(--lamp-key);
+  border-radius: 3px;
+  padding: 4px;
+  box-shadow: 0 0 10px rgba(111, 211, 154, 0.4);
   /* The tile is a duration wide, so this can be narrower than its own label.
      Clipping beats wrapping, which would push the tile's height around. */
   white-space: nowrap;
@@ -986,16 +1357,12 @@
 }
 
 .grid-slot__suggest-btn:hover {
-  background: var(--accent-diatonic);
-  color: var(--bg-0);
+  filter: brightness(1.1);
 }
 
 /* Reverting to the default is not a destructive action, so it sits quietly at
-   the end of the header rather than competing with the chords below it. Needs
-   the extra class to outrank `.tp-btn`'s `all: unset`, which is declared later
-   in this file and would otherwise reset the margin. */
-.tp-strip__header .tp-strip__revert {
-  margin-left: auto;
+   the end of the rail rather than competing with the chords below it. */
+.tp-strip__revert {
   font-size: 11px;
 }
 
@@ -1005,18 +1372,20 @@
    melody lane begins. `left`/`top` are set inline. */
 .grid-slot__popover {
   position: fixed;
-  z-index: 40; /* over the transport bar, under the loading overlay */
+  z-index: 40; /* over the transport bar and the wood, under the loading overlay */
   white-space: nowrap;
-  padding: 5px;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
+  padding: 7px;
+  background: linear-gradient(180deg, var(--panel-top), var(--panel-bot));
+  border: 1px solid var(--panel-line);
   border-radius: var(--radius);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    inset 0 1px 0 var(--edge),
+    0 12px 30px rgba(0, 0, 0, 0.65);
 }
 
 .grid-slot__popover .tp-size-group {
-  border: none;
   background: transparent;
+  box-shadow: none;
   padding: 0;
   flex-wrap: nowrap;
 }
@@ -1035,20 +1404,24 @@
 .chord-editor__section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
 .chord-editor__section + .chord-editor__section {
-  border-top: 1px solid var(--line);
-  padding-top: 8px;
+  border-top: 1px solid #000;
+  box-shadow: 0 -1px 0 var(--edge);
+  padding-top: 9px;
 }
 
-.chord-editor__label {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.08em;
+.chord-editor__label,
+.grid-slot__popover-title {
+  font-family: var(--font-legend);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: #7f8078;
+  text-shadow: 0 1px 0 #000;
 }
 
 /* Six across, twice — the chromatic octave splits evenly, and a 12-wide row
@@ -1059,7 +1432,8 @@
   gap: 3px;
 }
 
-.chord-editor__degree {
+.chord-editor__degree,
+.chord-editor__duplicate {
   all: unset;
   cursor: pointer;
   box-sizing: border-box;
@@ -1067,23 +1441,32 @@
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  padding: 4px 2px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--bg-1);
+  padding: 5px 2px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #3d3f38, #2c2e28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 1px 0 #0a0b0a;
   text-align: center;
 }
 
-.chord-editor__degree:hover {
-  background: var(--bg-3);
-  border-color: var(--ink-faint);
+.chord-editor__degree:hover,
+.chord-editor__duplicate:hover {
+  background: linear-gradient(180deg, #4a4c44, #35372f);
 }
 
-/* The degree this chord is already on. Same accent the in-key strip uses, so
+/* The degree this chord is already on. Same lamp the in-key strip uses, so
    "where the chord is" is the same color wherever it is shown. */
 .chord-editor__degree[aria-pressed='true'] {
-  border-color: var(--accent-diatonic);
-  background: color-mix(in srgb, var(--accent-diatonic) 16%, transparent);
+  background: linear-gradient(180deg, #17211b, #202a23);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.7),
+    inset 0 0 0 1px color-mix(in srgb, var(--lamp-key) 55%, transparent);
+}
+
+.chord-editor__degree[aria-pressed='true'] .chord-editor__degree-roman {
+  color: var(--lamp-key);
+  text-shadow: 0 0 8px rgba(111, 211, 154, 0.5);
 }
 
 .chord-editor__degree-roman {
@@ -1099,25 +1482,14 @@
 }
 
 .chord-editor__duplicate {
-  all: unset;
-  cursor: pointer;
-  box-sizing: border-box;
-  display: flex;
+  flex-direction: row;
   align-items: baseline;
   justify-content: center;
   gap: 6px;
-  padding: 6px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--bg-1);
+  padding: 7px 6px;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--ink);
-}
-
-.chord-editor__duplicate:hover {
-  background: var(--bg-3);
-  border-color: var(--accent-diatonic);
 }
 
 /* What duplicating will do to the timeline, said before it happens: the copy
@@ -1129,10 +1501,12 @@
 }
 
 /* How long this chord lasts, in beats — the number the grip is setting.
-   Inside the chord face rather than under it, where the edit button lives. */
+   Anchored to the top of the slot rather than its bottom: a filled slot
+   carries an edit button below the cap, and `bottom` would drop this on top
+   of it. 66px is the cap's own lower-right corner at its 84px height. */
 .grid-slot__beats {
   position: absolute;
-  top: 54px;
+  top: 66px;
   right: 10px;
   font-family: var(--font-mono);
   font-size: 9px;
@@ -1148,9 +1522,9 @@
   top: 0;
   right: 0;
   width: 7px;
-  height: 72px;
+  height: 84px;
   cursor: ew-resize;
-  border-radius: 0 var(--radius) var(--radius) 0;
+  border-radius: 0 5px 5px 0;
   touch-action: none;
 }
 
@@ -1159,18 +1533,18 @@
 .grid-slot__grip--start {
   right: auto;
   left: 0;
-  border-radius: var(--radius) 0 0 var(--radius);
+  border-radius: 5px 0 0 5px;
 }
 
 .grid-slot__grip:hover,
 .grid-slot__grip:focus-visible {
-  background: var(--accent-diatonic);
-  opacity: 0.55;
+  background: var(--lamp-on);
+  opacity: 0.5;
 }
 
 /* Short chords can't hold their own text, so a tile sheds it in stages: the
    chord name first, then the numeral and its controls. What survives longest
-   is what a two-pixel-wide chord still needs — its color, and a way to delete
+   is what a two-pixel-wide chord still needs — its lamp, and a way to delete
    it. The tooltip and the aria label always say the whole thing. */
 .grid-slot--narrow .chord-face__name,
 .grid-slot--narrow .grid-slot__beats,
@@ -1183,13 +1557,23 @@
 }
 
 .grid-slot--narrow .chord-face__roman {
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .grid-slot--narrow .chord-face,
 .grid-slot--tiny .chord-face {
-  padding-left: 4px;
-  padding-right: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+/* The lamp is inset from the cap's edges; on a very narrow tile that inset is
+   most of the tile, so pull it in. */
+.grid-slot--narrow .chord-face::before,
+.grid-slot--narrow .chord-face::after,
+.grid-slot--tiny .chord-face::before,
+.grid-slot--tiny .chord-face::after {
+  left: 4px;
+  right: 4px;
 }
 
 .grid-slot--narrow .grid-slot__edit-btn {
@@ -1206,7 +1590,7 @@
 }
 
 /* ---------------------------------------------------------------------- */
-/* Transport                                                               */
+/* Transport — the chassis's bottom control rail                           */
 /* ---------------------------------------------------------------------- */
 
 .tp-transport {
@@ -1214,15 +1598,24 @@
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 18px;
-  padding: 12px clamp(14px, 3vw, 40px);
+  gap: 16px;
+  padding: 12px calc(var(--cheek-w) + clamp(10px, 2vw, 24px));
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  background: var(--bg-1);
-  border-top: 1px solid var(--line);
-  z-index: 10;
+  background-color: #22241f;
+  background-image: var(--sheen), var(--grain), linear-gradient(180deg, #33352f, #15161a);
+  background-size:
+    auto,
+    var(--grain-size),
+    auto;
+  background-repeat: no-repeat, repeat-y, no-repeat;
+  border-top: 1px solid #000;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 -6px 18px rgba(0, 0, 0, 0.5);
 }
 
 /* On wide layouts these two grouping wrappers are invisible to layout —
@@ -1243,43 +1636,67 @@
   cursor: pointer;
   align-items: center;
   gap: 6px;
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: 12px;
   color: var(--ink-dim);
   padding: 8px 12px;
   border-radius: var(--radius);
-  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #3d3f38, #2c2e28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 1px 0 #0a0b0a;
   flex: none;
 }
 
 .tp-transport__more-toggle[aria-expanded='true'] {
   color: var(--ink);
-  background: var(--bg-2);
+  background: linear-gradient(180deg, #17181a, #232520);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7);
 }
 
+/* The one control that is always the biggest thing on the panel. */
 .tp-transport__play {
   all: unset;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 46px;
+  height: 46px;
   border-radius: 999px;
-  background: var(--accent-surprise);
-  color: #10111a;
+  border: 1px solid #000;
+  background: radial-gradient(circle at 50% 28%, #575a50, #232520 72%);
+  box-shadow:
+    0 2px 0 #080908,
+    0 4px 8px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.13);
+  color: var(--lamp-on);
   font-size: 15px;
+  text-shadow: 0 0 10px rgba(244, 239, 223, 0.5);
   flex: none;
 }
 
 .tp-transport__play:hover {
-  filter: brightness(1.08);
+  background: radial-gradient(circle at 50% 28%, #64685c, #292b25 72%);
+}
+
+.tp-transport__play:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 0 0 #080908,
+    inset 0 2px 5px rgba(0, 0, 0, 0.7);
+}
+
+.tp-transport__play:disabled {
+  cursor: default;
+  color: var(--ink-faint);
+  text-shadow: none;
 }
 
 .tp-transport__group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   font-size: 12px;
   color: var(--ink-dim);
 }
@@ -1287,39 +1704,67 @@
 .tp-transport__group label {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   cursor: pointer;
   white-space: nowrap;
 }
 
+/* The tempo readout: lit glass, the only amber in the interface, and the only
+   thing that looks like a display rather than a control. */
 .tp-tempo-input {
-  width: 56px;
+  position: relative;
+  width: 66px;
   font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 4px 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffe9b0;
+  background: #120f08;
+  border: none;
+  border-radius: 3px;
+  padding: 7px 10px;
+  text-shadow: 0 0 9px rgba(255, 201, 92, 0.75);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.9),
+    inset 0 0 14px rgba(255, 180, 60, 0.14),
+    0 1px 0 var(--edge);
+  /* The spinner is a browser widget with no place on a panel. */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.tp-tempo-input::-webkit-outer-spin-button,
+.tp-tempo-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .tp-toggle {
   all: unset;
   cursor: pointer;
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
   color: var(--ink-dim);
-  padding: 5px 9px;
+  padding: 8px 12px;
   border-radius: var(--radius);
-  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #3d3f38, #2c2e28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 1px 0 #0a0b0a;
+}
+
+.tp-toggle:hover {
+  color: var(--ink);
+  background: linear-gradient(180deg, #4a4c44, #35372f);
 }
 
 .tp-toggle[aria-pressed='true'] {
-  color: var(--accent-diatonic);
-  border-color: color-mix(in srgb, var(--accent-diatonic) 45%, var(--line));
-  background: var(--accent-diatonic-bg);
+  color: var(--lamp-on);
+  background: linear-gradient(180deg, #17181a, #232520);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 0 8px rgba(244, 239, 223, 0.35);
 }
 
 .tp-transport__mixer {
@@ -1329,19 +1774,11 @@
 .tp-transport__mixer label {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
 }
 
 .tp-transport__mixer input[type='range'] {
-  width: 74px;
-  accent-color: var(--accent-diatonic);
-}
-
-.tp-mixer__label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--ink-faint);
+  width: 82px;
 }
 
 .tp-transport__spacer {
@@ -1359,46 +1796,51 @@
 }
 
 .tp-midi-picker__select {
-  font-family: var(--font-display);
-  font-size: 12px;
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 5px 7px;
   max-width: 160px;
 }
 
 .tp-btn {
   all: unset;
   cursor: pointer;
+  box-sizing: border-box;
+  font-family: var(--font-ui);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
+  padding: 8px 13px;
   border-radius: var(--radius);
-  padding: 7px 12px;
+  border: 1px solid #0a0b0a;
+  background: linear-gradient(180deg, #3d3f38, #2c2e28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 1px 0 #0a0b0a,
+    0 2px 4px rgba(0, 0, 0, 0.4);
   white-space: nowrap;
 }
 
 .tp-btn:hover {
-  background: var(--bg-3);
+  background: linear-gradient(180deg, #4a4c44, #35372f);
+}
+
+.tp-btn:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.65);
 }
 
 .tp-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
+  transform: none;
 }
 
 .tp-btn--accent {
-  background: var(--accent-diatonic);
-  color: #0a1310;
-  border-color: transparent;
+  color: var(--lamp-on);
+  text-shadow: 0 0 8px rgba(244, 239, 223, 0.4);
+  background: linear-gradient(180deg, #53564b, #35372f);
 }
 
 .tp-btn--accent:hover {
-  filter: brightness(1.06);
+  background: linear-gradient(180deg, #5f6256, #3c3e35);
 }
 
 .tp-midi-hint {
@@ -1409,10 +1851,11 @@
   font-size: 11px;
   line-height: 1.4;
   color: var(--ink-dim);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--panel-top), var(--panel-bot));
+  border: 1px solid var(--panel-line);
   border-radius: var(--radius);
   padding: 8px 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
 }
 
 .tp-midi-status {
@@ -1421,18 +1864,44 @@
 }
 
 .tp-midi-status--denied {
-  color: var(--accent-borrowed);
+  color: var(--lamp-borrowed);
 }
 
 .tp-midi-status--granted {
-  color: var(--accent-diatonic);
+  color: var(--lamp-key);
 }
 
 /* ---------------------------------------------------------------------- */
 /* Narrow layouts                                                          */
 /* ---------------------------------------------------------------------- */
 
+@media (max-width: 900px) {
+  /* Screws and a 22px well margin are a luxury of a wide panel; on a small
+     screen that margin is real estate the timeline needs. */
+  .tp-strip__cells,
+  .tp-grid__scroll,
+  .tp-lane {
+    margin-inline: 10px;
+  }
+
+  .tp-strip__header,
+  .tp-grid__header {
+    padding-inline: 14px;
+  }
+
+  .tp-strip::after,
+  .tp-grid::after {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
+  /* The cheeks stay — they are what makes it one machine — but narrow, so
+     they cost a phone almost nothing. */
+  :root {
+    --cheek-w: 12px;
+  }
+
   .tp-header {
     flex-direction: column;
     align-items: flex-start;
@@ -1440,6 +1909,11 @@
 
   .tp-model-badge {
     margin-left: 0;
+  }
+
+  .tp-rail__end {
+    margin-left: 0;
+    width: 100%;
   }
 
   /* The transport carries too much (play, bpm, loop, piano, style, two
@@ -1512,15 +1986,13 @@
 }
 
 /* ---------------------------------------------------------------------- */
-/* Touch targets                                                          */
+/* Touch targets                                                           */
 /* ---------------------------------------------------------------------- */
 /* Gated on (pointer: coarse) rather than viewport width: a touch-only
    control needs a bigger hit area on a coarse-pointer tablet at desktop
    width too, and a resized desktop browser window (mouse) shouldn't grow
-   buttons just because it's narrow. Below the 44x44 CSS px minimum before
-   this: tonic buttons (~26x27), the scale select (~34 tall), the reroll
-   button (~28 tall), the transport's play button (40x40), its toggles,
-   tempo input and selects (~26-34 tall), and the plain .tp-btn family. */
+   buttons just because it's narrow. */
+
 @media (pointer: coarse) {
   .tp-tonic-btn {
     min-width: 44px;
@@ -1528,9 +2000,10 @@
     padding: 10px 9px;
   }
 
-  .tp-scale-select {
+  .tp-scale-select,
+  .tp-midi-picker__select {
     min-height: 44px;
-    padding: 10px 12px;
+    padding-block: 10px;
   }
 
   .tp-reroll-btn {
@@ -1544,17 +2017,16 @@
      matters most for a row of adjacent small buttons. */
   .tp-size-btn {
     min-height: 44px;
-    padding: 10px 10px;
+    padding: 10px;
   }
 
   .tp-transport__play {
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
   }
 
   .tp-toggle,
   .tp-btn,
-  .tp-midi-picker__select,
   .tp-tempo-input,
   .tp-transport__more-toggle {
     min-height: 44px;

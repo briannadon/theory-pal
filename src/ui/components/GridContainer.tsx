@@ -118,7 +118,14 @@ export function GridContainer({
   return (
     <section className="tp-grid">
       <div className="tp-grid__header">
-        <span className="tp-strip__eyebrow">Progression</span>
+        <div className="tp-panel__legend">
+          <span className="tp-strip__eyebrow">Progression</span>
+          <span className="tp-strip__hint">
+            Drag a tile’s right edge to set how long its chord lasts, its left edge to move where
+            it starts.
+          </span>
+        </div>
+        <div className="tp-rail__end">
         <div className="tp-size-group" role="group" aria-label="Grid size in bars">
           {SIZES.map((sz) => (
             <button
@@ -145,19 +152,10 @@ export function GridContainer({
             </button>
           ))}
         </div>
-        <span className="tp-strip__hint">
-          drag a tile’s right edge to set how long its chord lasts, its left edge to move where
-          it starts
-        </span>
-        <button
-          type="button"
-          className="tp-btn"
-          onClick={onClearGrid}
-          disabled={!hasChords}
-          style={{ marginLeft: 'auto' }}
-        >
+        <button type="button" className="tp-btn" onClick={onClearGrid} disabled={!hasChords}>
           Clear
         </button>
+        </div>
       </div>
 
       <div className="tp-grid__scroll">

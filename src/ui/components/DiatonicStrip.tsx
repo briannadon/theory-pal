@@ -59,12 +59,16 @@ export function DiatonicStrip({ keyValue, onAudition }: DiatonicStripProps) {
   return (
     <section className="tp-strip">
       <div className="tp-strip__header">
-        <span className="tp-strip__eyebrow">In key</span>
-        <ModifierBar value={mods} onToggle={toggle} ariaLabel="Chord modifiers" />
-        <span className="tp-strip__hint" style={{ marginLeft: 'auto' }}>
-          <span className="tp-hint--fine">click to hear · drag into the grid</span>
-          <span className="tp-hint--coarse">tap to hear · hold, then drag into the grid</span>
-        </span>
+        <div className="tp-panel__legend">
+          <span className="tp-strip__eyebrow">In key</span>
+          <span className="tp-strip__hint">
+            <span className="tp-hint--fine">Click to hear. Drag into the grid.</span>
+            <span className="tp-hint--coarse">Tap to hear. Hold, then drag into the grid.</span>
+          </span>
+        </div>
+        <div className="tp-rail__end">
+          <ModifierBar value={mods} onToggle={toggle} ariaLabel="Chord modifiers" />
+        </div>
       </div>
       <div className="tp-strip__cells">
         {chords.map((chord, i) => {

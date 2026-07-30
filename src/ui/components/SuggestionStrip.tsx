@@ -34,22 +34,24 @@ export function SuggestionStrip({
   return (
     <section className={`tp-strip${targetLabel ? ' tp-strip--targeted' : ''}`}>
       <div className="tp-strip__header">
-        <span className="tp-strip__eyebrow">{targetLabel ? 'Here' : 'Next'}</span>
-        {targetLabel ? (
-          <>
-            <span className="tp-strip__hint">chords for the selected slot, {targetLabel}</span>
-            {onClearTarget && (
-              <button type="button" className="tp-btn tp-strip__revert" onClick={onClearTarget}>
-                suggest next chord instead
-              </button>
-            )}
-          </>
-        ) : (
-          <span className="tp-strip__hint">
-            ranked by likelihood ·
-            <span className="tp-hint--fine"> drag into the grid</span>
-            <span className="tp-hint--coarse"> hold, then drag into the grid</span>
-          </span>
+        <div className="tp-panel__legend">
+          <span className="tp-strip__eyebrow">{targetLabel ? 'Here' : 'Next'}</span>
+          {targetLabel ? (
+            <span className="tp-strip__hint">Chords for the selected slot, {targetLabel}.</span>
+          ) : (
+            <span className="tp-strip__hint">
+              Ranked by likelihood.
+              <span className="tp-hint--fine"> Drag into the grid.</span>
+              <span className="tp-hint--coarse"> Hold, then drag into the grid.</span>
+            </span>
+          )}
+        </div>
+        {targetLabel && onClearTarget && (
+          <div className="tp-rail__end">
+            <button type="button" className="tp-btn tp-strip__revert" onClick={onClearTarget}>
+              Suggest next chord instead
+            </button>
+          </div>
         )}
       </div>
       <div className="tp-strip__cells">

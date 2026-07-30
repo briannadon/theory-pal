@@ -6,7 +6,7 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg-0);
+  background: var(--void);
   color: var(--ink);
   /* Backstop against any element that miscalculates its width and pushes the
      page wider than the viewport. Deliberate horizontal scrollers (chord

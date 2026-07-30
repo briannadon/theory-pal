@@ -99,8 +99,19 @@ export function MelodySection({
   return (
     <section className="tp-strip">
       <div className="tp-strip__header tp-melody-header">
-        <span className="tp-strip__eyebrow">Melody</span>
+        <div className="tp-panel__legend">
+          <span className="tp-strip__eyebrow">Melody</span>
+          <span className="tp-strip__hint tp-melody-hint">
+            Click to add a note, drag to move it, drag its right edge to lengthen it. Hover a chord
+            to see its tones.
+          </span>
+          <span className="tp-strip__hint tp-melody-hint tp-melody-hint--touch">
+            Tap to add a note, drag to move it, drag its right edge to lengthen it. Erase mode plus
+            a tap removes one.
+          </span>
+        </div>
 
+        <div className="tp-rail__end">
         <div className="tp-size-group" role="group" aria-label="Melody grid resolution">
           {RESOLUTIONS.map((r) => (
             <button
@@ -181,15 +192,7 @@ export function MelodySection({
         >
           Clear
         </button>
-
-        <span className="tp-strip__hint tp-melody-hint">
-          click to add · drag to move · drag the right edge to lengthen · click a note to delete ·
-          hover a chord to see its tones
-        </span>
-        <span className="tp-strip__hint tp-melody-hint tp-melody-hint--touch">
-          tap to add · drag a note to move it · drag its right edge to lengthen · Erase mode + tap
-          removes a note
-        </span>
+        </div>
       </div>
 
       <MelodyLane
